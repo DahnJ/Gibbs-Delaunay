@@ -1,8 +1,0 @@
-While iterating
-  Step number - B/D/M - Energy - Energy proposed - b - Accept -  Number of [active] points after - Time taken
-
-Output for analysis
-  Distributions: Area - Surface - Edge length - Points per cell - Neighbors - Weights
-  Number of: Vertices - Cells
-
-Visual output
