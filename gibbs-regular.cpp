@@ -10,6 +10,7 @@
 #include <time.h>
 #include <tuple>
 #include <fstream>
+#include <chrono>
 
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
@@ -38,6 +39,10 @@ typedef Rt::Tetrahedron						Tetrahedron;
 typedef Rt::Cell_handle						Cell_handle;
 
 
+
+
+///// Functions for calculating basic stats
+
 double minimumEdgeLength( const Tetrahedron& t){
 	double minimum_edge_length = 1000000;
 	for (int i = 0; i<3; ++i){
@@ -55,6 +60,18 @@ double edgeLength( const Edge & e ) {
 	return(CGAL::sqrt(CGAL::squared_distance(std::get<0>(e),std::get<1>(e))));
 
 }
+
+double  minimumFaceArea( const Tetrahedron&  t ){
+    double minimum_face_area = 1000000;
+    for ( int i = 0; i < 4; ++i ) {
+        double face_area_squared = CGAL::squared_area(t.vertex(i), t.vertex(i+1), t.vertex(i+2));
+        if (face_area_squared < minimum_face_area) {
+            minimum_face_area = face_area_squared;
+        }
+    } 
+    return CGAL::sqrt(minimum_face_area);
+}
+
 
 double faceArea( const Face & f) {
 	return(CGAL::sqrt(CGAL::squared_area(std::get<0>(f), std::get<1>(f), std::get<2>(f))));
@@ -76,6 +93,8 @@ double surfaceArea( const Tetrahedron& t) {
 }
 
 
+
+/////////// Functions to check and remain within the unit box
 
 bool isWithinUnitBox(const Point& p) {
 	return( (p.x() < 1) && (p.x() >= 0)
@@ -106,6 +125,9 @@ Point bouncePoint(const Point& p){
 
 
 
+
+//////////// Sampling
+
 std::random_device	rand_dev;
 std::mt19937		generator(rand_dev());
 //std::mt19937		generator(5);
@@ -134,6 +156,12 @@ Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
 }
 
 
+
+
+
+
+
+//////////////////
 // TODO: Polymorphism for Power - Delaunay?
 // Class preparation
 // Constructor
@@ -329,9 +357,9 @@ public:
 	}
 
 
-	void initialize(bool from_file = true) {
+	void initialize(bool from_file = true, std::string filename = "files/regular-grid.txt") {
 		if (from_file){
-			std::ifstream f("initial.txt");
+			std::ifstream f(filename);
 			f.precision(17);
 			f >> T;
 			std::cout << T.is_valid() << std::endl;
@@ -372,6 +400,7 @@ public:
 	}
 
 
+    // This function is now obsolete: hidden points are disabled
  	void writeHiddenPoints() const {
 		std::cout << "Hidden points: " << std::endl;
 		int count = 0;
@@ -514,7 +543,7 @@ public:
 	void step( std::ofstream& f){
 		double a = unif(generator);
 		if (a < 1.0/3.0) {
-			std::cout << "B,";
+			std::cout << "B,";            // TODO: Improve the output? E.g. not having two streams, having options for streams (more verbose?)
             f << "B,";
 			int prev_total_n = T.number_of_vertices();
 			int n = number_of_active_points;
@@ -696,7 +725,7 @@ public:
 	}
 
 	
-	void analyze() const {
+	void analyze( std::string filename  ) const {
 		// Get only active cells
 		std::vector<Tetrahedron> active_tetrahedra;
 		std::set<Face> active_faces;
@@ -743,6 +772,12 @@ public:
 
 		std::cout << tetrahedra_volumes.size() << " " << face_surfaces.size() << " " << edge_lengths.size() << " " << point_degrees.size() << " " << point_weights.size() << std::endl;
 
+        std::ofstream f(filename);
+        // f << tetrahedra_volumes << std::endl;
+        // f << face_surfaces << std::endl;
+        // f << edge_lengths << std::endl;
+        // f << point_degrees << std::endl;
+
 	}
 
 
@@ -752,16 +787,28 @@ public:
 
 
 int main() {
-    std::ofstream f("log.csv");
+    // Get a timestamp for the files
+    std::chrono::time_point<std::chrono::system_clock> time_now = std::chrono::system_clock::now();
+    std::time_t time_now_t = std::chrono::system_clock::to_time_t(time_now);
+    std::tm now_tm = *std::localtime(&time_now_t);
+    char buf[512];
+    std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
 
+
+    int coef = 1;
+    int expon = 1;
+    std::string filename(buf);
+    filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
+
+    std::ofstream f("files/log" + filename + ".csv");
 
 	Gibbs_Delaunay GD;
-	GD.initialize(true);  // has to be false, file I/O buggy for larger triangulations?
-	GD.iterate(1*pow(10,6), f);
+	GD.initialize(true, "files/regular-grid.txt");  
+	GD.iterate(coef*pow(10,expon), f);
 	std::cout << GD.numberOfPoints() << " " << GD.numberOfActivePoints() << " " << GD.numberOfInactivePoints() <<  std::endl;
-	GD.writeToFile("gibbs.txt");
-	GD.analyze();
-	GD.writeHiddenPoints();
+	GD.writeToFile("files/gibbs" + filename + ".txt");
+	GD.analyze( "files/cell_data" + filename + ".txt" );
+
 
 
     f.close();
