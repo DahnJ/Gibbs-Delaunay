@@ -5,12 +5,14 @@
 // #include <CGAL/Kernel/global_functions.h>
 #include <vector>
 #include <iostream>
-#include <math.h>
+#include <cmath>
 #include <random>
-#include <time.h>
+#include <ctime>
 #include <tuple>
 #include <fstream>
 #include <chrono>
+#include <limits>
+#include <numeric> // for vector sum
 
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
@@ -38,6 +40,29 @@ typedef Rt::Tetrahedron						Tetrahedron;
 
 typedef Rt::Cell_handle						Cell_handle;
 
+
+// TODO: Rewrite forbidden to infinity
+
+// Abstractions
+// - easily specifiable energy function and calculation
+// - delaunay x regular
+
+
+template <typename T>
+std::ostream& operator<< (std::ostream& out, const std::vector<T> v){
+    if ( !v.empty() ){
+        out << '[';
+        std::copy( v.begin(), v.end(), std::ostream_iterator<T>(out, ", ") );
+        out << "\b\b]";
+    }
+    return out;
+}
+
+
+
+double sign(double x){
+    return ( (x>0) - (x<0) );
+}
 
 
 
@@ -148,7 +173,6 @@ Point uniformDistributionPoint(){
 	return(Point(unif(generator),unif(generator),unif(generator)));
 }
 
-// TODO: Weight 
 Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
 	Point p = uniformDistributionPoint();
 	Weight w = uniformDistribution(max);
@@ -161,22 +185,6 @@ Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
 
 
 
-//////////////////
-// TODO: Polymorphism for Power - Delaunay?
-// Class preparation
-// Constructor
-// 	- one more parameter
-// double updateEnergy()
-// double expEnergy()
-// Vertex_Handle chooseRandomVertex()
-// 	- different return (Dt vs Rt)
-// void iNitialize()
-// 	- weighted points vs points
-// add, remove, move
-// 	- just checking for empty handle + different handles + weights
-// step
-// 	- again, checking for empty hadle + different handles
-// void iterate()
 class Gibbs_Delaunay{
 private:
 	double minimum_edge_length;
@@ -195,7 +203,7 @@ private:
 
 
 public:
-	Gibbs_Delaunay( double _minimum_edge_length = 0.01, double _maximum_circumradius = 0.1, double _theta = 1.0, double _intensity = 1.0, double _max_weight = 0.01):
+	Gibbs_Delaunay( double _minimum_edge_length = 0.01, double _maximum_circumradius = 0.1, double _theta = 1.0, double _intensity = 500.0, double _max_weight = 0.01):
 		minimum_edge_length(_minimum_edge_length), maximum_circumradius(_maximum_circumradius), theta(_theta), intensity(_intensity), max_weight(_max_weight), forbidden(0) {  }; 
 
 	int numberOfPoints() const {
@@ -303,7 +311,7 @@ public:
 
 
 	double expEnergy(double energy){
-		return(exp(-0.01*energy));
+		return(exp(-energy));
 	}
 
 	Rt::Vertex_handle chooseRandomVertexBetter(){
@@ -362,7 +370,7 @@ public:
 			std::ifstream f(filename);
 			f.precision(17);
 			f >> T;
-			std::cout << T.is_valid() << std::endl;
+			std::cout << "Reading from file. Checking if the tesselation is valid: " << T.is_valid() << std::endl;
 		} 
 		else
 		{
@@ -464,7 +472,7 @@ public:
     }
 
     // Decides if a point can be added, i.e. 1. Is not already present, 2. Won't delete some existing point, 3. Won't be deleted itself
-    bool canBeAdded(const Weighted_point& p){
+    bool doesNotConflict(const Weighted_point& p){
         Cell_handle containing_cell = T.locate(p);
         if (cellHasPoint(containing_cell, p)) return false;
         
@@ -549,7 +557,7 @@ public:
 			int n = number_of_active_points;
 		    	
             Weighted_point x = uniformDistributionWeightedPoint();
-			if (canBeAdded(x)) {
+			if (doesNotConflict(x)) {
 
 			    std::cout << x << ", ,";
                 f << x << ", ,";
@@ -643,7 +651,7 @@ public:
 			Weighted_point x( bouncePoint(T.point(vertex).point() + move_by)  , T.point(vertex).weight());
 			// std::cout << "Proposing to move the point " << std::endl << T.point(vertex) << " by " << std::endl <<  move_by << " to " << std::endl <<  x;
 			
-            if (canBeAdded(x)) {
+            if (doesNotConflict(x)) {
                 std::cout << old_point << "," << x << ",";
                 f << old_point << "," << x << ",";
                 int prev_total_n = T.number_of_vertices();
@@ -694,8 +702,9 @@ public:
 		return count;
 	}
 
-	void iterate(int number_of_iterations, std::ofstream& f ){
+	void iterate(int number_of_iterations, std::string filename ){
 		clock_t start;
+        std::ofstream f(filename);
         std::cout << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
         f << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
 		for (int k = 1; k <= number_of_iterations; ++k){
@@ -717,7 +726,7 @@ public:
 
 
 
-	void writeToFile(std::string filename) const {
+	void writeTessellationToFile(std::string filename) const {
 		std::ofstream f(filename);
 		f.precision(17);
 		f << T;
@@ -725,6 +734,11 @@ public:
 	}
 
 	
+    
+
+
+
+
 	void analyze( std::string filename  ) const {
 		// Get only active cells
 		std::vector<Tetrahedron> active_tetrahedra;
@@ -750,6 +764,7 @@ public:
 		
 
 		std::vector<double> tetrahedra_volumes;
+        std::vector<double> tetrahedra_circumradii;
 		std::vector<double> face_surfaces;
 		std::vector<double> edge_lengths;
 		std::vector<double> point_weights;
@@ -758,7 +773,10 @@ public:
 
 		// Data to output
 		// Distributions
-		for(Tetrahedron t: active_tetrahedra) { tetrahedra_volumes.push_back(t.volume()); }
+		for(Tetrahedron t: active_tetrahedra) { 
+            tetrahedra_volumes.push_back(t.volume());
+            tetrahedra_circumradii.push_back(circumradius(t));
+        }
 		for(Face f: active_faces) { face_surfaces.push_back(faceArea(f)); }
 		for(Edge e: active_edges) { edge_lengths.push_back(edgeLength(e)); }
 		for(Rt::Vertex_handle v: active_vertices) { 
@@ -770,15 +788,192 @@ public:
 		int number_of_vertices = point_weights.size();
 		int number_of_cells = active_tetrahedra.size();
 
-		std::cout << tetrahedra_volumes.size() << " " << face_surfaces.size() << " " << edge_lengths.size() << " " << point_degrees.size() << " " << point_weights.size() << std::endl;
+		// std::cout << tetrahedra_volumes.size() << " " << face_surfaces.size() << " " << edge_lengths.size() << " " << point_degrees.size() << " " << point_weights.size() << std::endl;
 
+        // Output to a file
         std::ofstream f(filename);
-        // f << tetrahedra_volumes << std::endl;
-        // f << face_surfaces << std::endl;
-        // f << edge_lengths << std::endl;
-        // f << point_degrees << std::endl;
+        f << tetrahedra_volumes << std::endl;
+        f << face_surfaces << std::endl;
+        f << edge_lengths << std::endl;
+        f << point_degrees << std::endl;
+
+
+
+
+        // Estimate hardcore parameters
+        double min_edge_est = *std::min_element( edge_lengths.begin(), edge_lengths.end() );
+        double min_face_est = *std::min_element( face_surfaces.begin(), face_surfaces.end() );
+        double max_circumradius_est = *std::min_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
+
+        std::cout << "Min_edge_est: " << min_edge_est << " Max_a_est: " << max_circumradius_est << std::endl;
+
+        // Estimate theta
+        // for enough repetitions
+        // generate random uniform addable point
+
 
 	}
+
+    double localEnergy( const Rt::Vertex_handle & v ) {
+        Weighted_point p = T.point(v);
+        double energy_before_removing = energy;
+        remove(v);
+        double energy_after_removing;
+        if (forbidden) { 
+            energy_after_removing = std::numeric_limits<double>::infinity();
+        }
+        else{
+            energy_after_removing = energy;
+        }
+        add(p);
+
+        return(energy_before_removing - energy_after_removing);
+    }
+
+
+    // TODO: Check for existing point?
+    double localEnergy( const Weighted_point & p ) {
+        if (!doesNotConflict(p)) { return std::numeric_limits<double>::infinity();  }     
+        double energy_before_adding = energy;
+        Rt::Vertex_handle v = add(p);
+        double energy_after_adding;
+        if (forbidden) {
+            energy_after_adding = std::numeric_limits<double>::infinity();   
+        }
+        else {
+            energy_after_adding = energy;
+        }
+        remove(v);
+
+        
+        return(energy_after_adding - energy_before_adding);
+    }
+
+
+        
+
+
+    bool isRemovable( const Rt::Vertex_handle & v ) {
+        bool is_removable = true;
+        Weighted_point p = T.point(v);
+        remove(v);
+        if (forbidden) { is_removable = false; }
+        add(p);
+        return is_removable;
+    }
+
+    int numberOfRemovablePoints() {
+		int count = 0;	
+		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
+			if ( isWithinUnitBox(T.point(v)) & isRemovable(v) ) { count++; };	
+		}
+		return count;
+    }
+    
+
+
+
+    double evaluateThetaEquation(double theta_estimate, const std::vector<double> & local_energy_samples, double constant){
+        double sum_value = 0;
+        for (double h_i: local_energy_samples){
+            sum_value += exp(-theta_estimate * h_i) * ( h_i - constant );
+        }
+        return sum_value;
+    }
+
+
+    void estimate() {
+        int samples_count = 0;
+        std::vector<double> samples;
+
+        // Sample local energy for the integrals
+        while (samples_count < 10000){
+            Weighted_point p = uniformDistributionWeightedPoint();
+            double local_energy = localEnergy(p) / theta; // Divide by theta to obtain energy with theta = 1
+            if (std::isfinite(local_energy)) { 
+                ++samples_count;
+                samples.push_back(local_energy);
+            }
+        }
+
+
+        // Evaluate the sum over removable points
+        // Get their count while iterating over them instead of using numberOfRemovablePoints()
+		int number_of_removable_points = 0;	
+        std::vector<double> local_energy_removable_points;
+		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
+			if ( isWithinUnitBox(T.point(v))) { 
+                double local_energy = localEnergy(v) / theta; // Divide by theta to obtain energy with theta = 1
+                if (std::isfinite(local_energy)) {
+                    ++number_of_removable_points;
+                    local_energy_removable_points.push_back(local_energy);
+                }
+            }	
+		} 
+        double constant = std::accumulate( local_energy_removable_points.begin(), local_energy_removable_points.end(), 0.0) / number_of_removable_points;
+     
+        
+        // std::vector<double> ticks; 
+        // double min = -100;
+        // double max = 100;
+        // int n = 200;
+        // double step = (max-min)/n;
+        // for (int i = 0; i < n; ++i) {
+        //     ticks.push_back(min + i*step);
+        // }
+
+        // for (double tick: ticks){
+        //     std::cout << evaluateThetaEquation(tick,samples,constant) << std::endl;
+        // }
+        
+        std::cout << "Number of removable points: " << number_of_removable_points << std::endl;
+
+
+        // The best equation solver
+        double error = 1;
+        double upper = 100;
+        double lower = -100;
+        double estimate;
+        assert( sign(evaluateThetaEquation(lower,samples,constant)) != sign(evaluateThetaEquation(upper,samples,constant)) ); 
+
+        while (error > 0.01){
+           estimate = (lower + upper) / 2.0;
+           error = fabs(evaluateThetaEquation(estimate,samples,constant));
+           std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
+
+           if (sign(evaluateThetaEquation(lower,samples,constant)) == sign(evaluateThetaEquation(estimate,samples,constant))) {
+               lower = estimate;
+           }
+           else {
+               upper = estimate;
+           }
+        }           
+
+
+        double theta_estimate = estimate;
+
+
+        // Estimate z (intensity)
+        // Estimate the integral
+        double integral_estimate = 0;
+        for (double h_i: samples){
+            integral_estimate += exp(-theta_estimate*h_i);
+        }
+        integral_estimate = integral_estimate / samples_count;
+        double z_estimate = number_of_removable_points / integral_estimate;
+
+        std::cout << "Theta estimate: " << theta_estimate << " intensity estimate: " << z_estimate << std::endl;
+    }
+
+    
+    void writeMetadata( std::string filename ) const {
+        std::ofstream f(filename);
+        f << "Minimum edge length: " << minimum_edge_length << std::endl;
+        f << "Maximum circumradius: " << maximum_circumradius << std::endl;
+        f << "Theta: " << theta << std::endl;
+        f << "Intensity: " << intensity << std::endl;
+        f << "Max weight: " << max_weight << std::endl;
+    }
 
 
 
@@ -788,6 +983,8 @@ public:
 
 int main() {
     // Get a timestamp for the files
+    // TODO: Improve the filenames / folders
+    // TODO: Save parameters, e.g. have metadata somewhere
     std::chrono::time_point<std::chrono::system_clock> time_now = std::chrono::system_clock::now();
     std::time_t time_now_t = std::chrono::system_clock::to_time_t(time_now);
     std::tm now_tm = *std::localtime(&time_now_t);
@@ -795,21 +992,25 @@ int main() {
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
 
 
-    int coef = 1;
-    int expon = 1;
+    int coef = 2;
+    int expon = 6;
     std::string filename(buf);
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
 
-    std::ofstream f("files/log" + filename + ".csv");
 
 	Gibbs_Delaunay GD;
+    // GD.initialize(true, "files/gibbs-1m.txt");
+    GD.writeMetadata("files/metadata" + filename + ".txt");
 	GD.initialize(true, "files/regular-grid.txt");  
-	GD.iterate(coef*pow(10,expon), f);
-	std::cout << GD.numberOfPoints() << " " << GD.numberOfActivePoints() << " " << GD.numberOfInactivePoints() <<  std::endl;
-	GD.writeToFile("files/gibbs" + filename + ".txt");
+	GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
+
+	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
+    std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
+
+
+	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
 	GD.analyze( "files/cell_data" + filename + ".txt" );
 
+    GD.estimate();
 
-
-    f.close();
 }
