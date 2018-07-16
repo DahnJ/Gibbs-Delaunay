@@ -53,7 +53,7 @@ std::ostream& operator<< (std::ostream& out, const std::vector<T> v){
     if ( !v.empty() ){
         out << '[';
         std::copy( v.begin(), v.end(), std::ostream_iterator<T>(out, ", ") );
-        out << "\b\b]";
+        out << "]";
     }
     return out;
 }
@@ -735,84 +735,25 @@ public:
 
 	
     
+    bool isRemovable( const Rt::Vertex_handle & v ) {
+        bool is_removable = true;
+        Weighted_point p = T.point(v);
+        remove(v);
+        if (forbidden) { is_removable = false; }
+        add(p);
+        return is_removable;
+    }
 
-
-
-
-	void analyze( std::string filename  ) const {
-		// Get only active cells
-		std::vector<Tetrahedron> active_tetrahedra;
-		std::set<Face> active_faces;
-		std::set<Edge> active_edges;
-		std::set<Rt::Vertex_handle> active_vertices;
-
-		for (Rt::Finite_cells_iterator cell = T.finite_cells_begin(); cell != T.finite_cells_end(); ++cell) {
-			if (isActive(cell)) { 
-				Tetrahedron t = T.tetrahedron(cell);				
-
-				active_tetrahedra.push_back(t); 
-				for (int i = 0; i < 4 ; ++i) {
-					active_vertices.insert(cell->vertex(i));
-					active_faces.insert(Face(t.vertex(i), t.vertex(i+1), t.vertex(i+2)));
-					for (int j = i + 1; j < 4; ++j){
-						active_edges.insert(Edge(t.vertex(i),t.vertex(j)));	
-					}
-				}
-				
-			} 
+    int numberOfRemovablePoints() {
+		int count = 0;	
+		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
+			if ( isWithinUnitBox(T.point(v)) & isRemovable(v) ) { count++; };	
 		}
-		
-
-		std::vector<double> tetrahedra_volumes;
-        std::vector<double> tetrahedra_circumradii;
-		std::vector<double> face_surfaces;
-		std::vector<double> edge_lengths;
-		std::vector<double> point_weights;
-		std::vector<int> point_degrees;
-		
-
-		// Data to output
-		// Distributions
-		for(Tetrahedron t: active_tetrahedra) { 
-            tetrahedra_volumes.push_back(t.volume());
-            tetrahedra_circumradii.push_back(circumradius(t));
-        }
-		for(Face f: active_faces) { face_surfaces.push_back(faceArea(f)); }
-		for(Edge e: active_edges) { edge_lengths.push_back(edgeLength(e)); }
-		for(Rt::Vertex_handle v: active_vertices) { 
-			point_weights.push_back(T.point(v).weight());
-			point_degrees.push_back(T.degree(v));
-		}
-
-		// Scalars
-		int number_of_vertices = point_weights.size();
-		int number_of_cells = active_tetrahedra.size();
-
-		// std::cout << tetrahedra_volumes.size() << " " << face_surfaces.size() << " " << edge_lengths.size() << " " << point_degrees.size() << " " << point_weights.size() << std::endl;
-
-        // Output to a file
-        std::ofstream f(filename);
-        f << tetrahedra_volumes << std::endl;
-        f << face_surfaces << std::endl;
-        f << edge_lengths << std::endl;
-        f << point_degrees << std::endl;
+		return count;
+    }
 
 
 
-
-        // Estimate hardcore parameters
-        double min_edge_est = *std::min_element( edge_lengths.begin(), edge_lengths.end() );
-        double min_face_est = *std::min_element( face_surfaces.begin(), face_surfaces.end() );
-        double max_circumradius_est = *std::min_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
-
-        std::cout << "Min_edge_est: " << min_edge_est << " Max_a_est: " << max_circumradius_est << std::endl;
-
-        // Estimate theta
-        // for enough repetitions
-        // generate random uniform addable point
-
-
-	}
 
     double localEnergy( const Rt::Vertex_handle & v ) {
         Weighted_point p = T.point(v);
@@ -853,22 +794,6 @@ public:
         
 
 
-    bool isRemovable( const Rt::Vertex_handle & v ) {
-        bool is_removable = true;
-        Weighted_point p = T.point(v);
-        remove(v);
-        if (forbidden) { is_removable = false; }
-        add(p);
-        return is_removable;
-    }
-
-    int numberOfRemovablePoints() {
-		int count = 0;	
-		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
-			if ( isWithinUnitBox(T.point(v)) & isRemovable(v) ) { count++; };	
-		}
-		return count;
-    }
     
 
 
@@ -882,7 +807,16 @@ public:
     }
 
 
-    void estimate() {
+    double evaluateThetaKnownZEquation(double theta_estimate, const std::vector<double> & local_energy_samples, double constant){
+        double sum_value = 0;
+        for (double h_i: local_energy_samples){
+            sum_value += intensity*h_i*exp(-theta_estimate* h_i) - constant;
+        }
+        return sum_value;
+    }
+
+
+    std::tuple<double,double,double>  estimate() {
         int samples_count = 0;
         std::vector<double> samples;
 
@@ -896,7 +830,8 @@ public:
             }
         }
 
-
+        
+        /// Theta with z unknown
         // Evaluate the sum over removable points
         // Get their count while iterating over them instead of using numberOfRemovablePoints()
 		int number_of_removable_points = 0;	
@@ -910,7 +845,8 @@ public:
                 }
             }	
 		} 
-        double constant = std::accumulate( local_energy_removable_points.begin(), local_energy_removable_points.end(), 0.0) / number_of_removable_points;
+        double constant_unnormalized = std::accumulate( local_energy_removable_points.begin(), local_energy_removable_points.end(), 0.0);
+        double constant = constant_unnormalized / number_of_removable_points;
      
         
         // std::vector<double> ticks; 
@@ -953,7 +889,7 @@ public:
         double theta_estimate = estimate;
 
 
-        // Estimate z (intensity)
+        /// Estimate z (intensity)
         // Estimate the integral
         double integral_estimate = 0;
         for (double h_i: samples){
@@ -962,7 +898,32 @@ public:
         integral_estimate = integral_estimate / samples_count;
         double z_estimate = number_of_removable_points / integral_estimate;
 
+
+
+        /// Theta with z known
+        // The best equation solver, again
+        error = 1;
+        upper = 100;
+        lower = -100;
+        assert( sign(evaluateThetaKnownZEquation(lower,samples,constant_unnormalized)) != sign(evaluateThetaKnownZEquation(upper,samples,constant_unnormalized)) ); 
+
+        while (error > 0.01){
+           estimate = (lower + upper) / 2.0;
+           error = fabs(evaluateThetaKnownZEquation(estimate,samples,constant));
+           std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaKnownZEquation(lower,samples,constant) << " " << evaluateThetaKnownZEquation(upper,samples,constant) << std::endl;
+
+           if (sign(evaluateThetaKnownZEquation(lower,samples,constant)) == sign(evaluateThetaKnownZEquation(estimate,samples,constant))) {
+               lower = estimate;
+           }
+           else {
+               upper = estimate;
+           }
+        }           
+        double theta_z_known_estimate = estimate;
+
         std::cout << "Theta estimate: " << theta_estimate << " intensity estimate: " << z_estimate << std::endl;
+
+        return std::make_tuple(theta_estimate,z_estimate,theta_z_known_estimate);
     }
 
     
@@ -974,12 +935,101 @@ public:
         f << "Intensity: " << intensity << std::endl;
         f << "Max weight: " << max_weight << std::endl;
     }
+   
+   
+	void analyze( std::string filename  )  {
+		// Get only active cells
+        // Gather data from active cells
+		std::vector<Tetrahedron> active_tetrahedra;
+		std::set<Face> active_faces;
+		std::set<Edge> active_edges;
+		std::set<Rt::Vertex_handle> active_vertices;
+        std::set<Rt::Vertex_handle> vertices_in_unit_box;
+
+		for (Rt::Finite_cells_iterator cell = T.finite_cells_begin(); cell != T.finite_cells_end(); ++cell) {
+			if (isActive(cell)) { 
+				Tetrahedron t = T.tetrahedron(cell);				
+
+				active_tetrahedra.push_back(t); 
+				for (int i = 0; i < 4 ; ++i) {
+					active_vertices.insert(cell->vertex(i));
+                    if (isWithinUnitBox(T.point(cell->vertex(i)))) { vertices_in_unit_box.insert(cell->vertex(i)); }
+					active_faces.insert(Face(t.vertex(i), t.vertex(i+1), t.vertex(i+2)));
+					for (int j = i + 1; j < 4; ++j){
+						active_edges.insert(Edge(t.vertex(i),t.vertex(j)));	
+					}
+				}
+				
+			} 
+		}
+		
+
+		std::vector<double> tetrahedra_volumes;
+        std::vector<double> tetrahedra_circumradii;
+		std::vector<double> face_surfaces;
+		std::vector<double> edge_lengths;
+		std::vector<double> point_weights;
+		std::vector<int> point_degrees;
+		
+
+		// Data to output
+		// Distributions
+        int number_of_removable_points = 0;
+
+		for(Tetrahedron t: active_tetrahedra) { 
+            tetrahedra_volumes.push_back(t.volume());
+            tetrahedra_circumradii.push_back(circumradius(t));
+        }
+		for(Face f: active_faces) { face_surfaces.push_back(faceArea(f)); }
+		for(Edge e: active_edges) { edge_lengths.push_back(edgeLength(e)); }
+		for(Rt::Vertex_handle v: vertices_in_unit_box) { 
+			point_weights.push_back(T.point(v).weight());
+			point_degrees.push_back(T.degree(v));
+            if (isRemovable(v)) { number_of_removable_points++; } 
+
+		}
+
+		// Scalars
+		int number_of_vertices = point_weights.size();
+		int number_of_cells = active_tetrahedra.size();
+
+		// std::cout << tetrahedra_volumes.size() << " " << face_surfaces.size() << " " << edge_lengths.size() << " " << point_degrees.size() << " " << point_weights.size() << std::endl;
+
+
+
+
+
+        // Estimate hardcore parameters
+        double min_edge_est = *std::min_element( edge_lengths.begin(), edge_lengths.end() );
+        double min_face_est = *std::min_element( face_surfaces.begin(), face_surfaces.end() );
+        double max_circumradius_est = *std::min_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
+
+        std::cout << "Min_edge_est: " << min_edge_est << " Max_a_est: " << max_circumradius_est << std::endl;
+
+        
+
+        // Estimate smooth interaction parameters
+        std::tuple<double,double,double> smooth_estimates  = estimate();
+
+        // Output to a file
+        std::ofstream f(filename);
+        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est" << std::endl; 
+
+        f << minimum_edge_length << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";";
+        f << tetrahedra_volumes << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
+        f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
+        f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates);
+        f << std::endl;
+
+	}
 
 
 
 
 };
-
+// TODO: Minimum face, not edge
+// TODO: Suggesting only addable points
+// 
 
 int main() {
     // Get a timestamp for the files
@@ -992,7 +1042,7 @@ int main() {
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
 
 
-    int coef = 2;
+    int coef = 5;
     int expon = 6;
     std::string filename(buf);
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
@@ -1006,11 +1056,10 @@ int main() {
 
 	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
     std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
-
+    std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
 
 	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
 	GD.analyze( "files/cell_data" + filename + ".txt" );
 
-    GD.estimate();
 
 }
