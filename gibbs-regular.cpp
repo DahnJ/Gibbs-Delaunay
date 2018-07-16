@@ -744,6 +744,7 @@ public:
         return is_removable;
     }
 
+    // TODO: Bug - this functon and the counter in analyze() give slightly different results
     int numberOfRemovablePoints() {
 		int count = 0;	
 		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
@@ -872,7 +873,7 @@ public:
         double estimate;
         assert( sign(evaluateThetaEquation(lower,samples,constant)) != sign(evaluateThetaEquation(upper,samples,constant)) ); 
 
-        while (error > 0.01){
+        while (error > 0.00001){
            estimate = (lower + upper) / 2.0;
            error = fabs(evaluateThetaEquation(estimate,samples,constant));
            std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
@@ -905,9 +906,10 @@ public:
         error = 1;
         upper = 100;
         lower = -100;
-        assert( sign(evaluateThetaKnownZEquation(lower,samples,constant_unnormalized)) != sign(evaluateThetaKnownZEquation(upper,samples,constant_unnormalized)) ); 
+        constant = constant_unnormalized;
+        assert( sign(evaluateThetaKnownZEquation(lower,samples,constant)) != sign(evaluateThetaKnownZEquation(upper,samples,constant)) ); 
 
-        while (error > 0.01){
+        while (error > 0.0001){
            estimate = (lower + upper) / 2.0;
            error = fabs(evaluateThetaKnownZEquation(estimate,samples,constant));
            std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaKnownZEquation(lower,samples,constant) << " " << evaluateThetaKnownZEquation(upper,samples,constant) << std::endl;
@@ -919,22 +921,22 @@ public:
                upper = estimate;
            }
         }           
-        double theta_z_known_estimate = estimate;
+        double theta_known_z_estimate = estimate;
 
-        std::cout << "Theta estimate: " << theta_estimate << " intensity estimate: " << z_estimate << std::endl;
+        std::cout << "Theta estimate: " << theta_estimate << " intensity estimate: " << z_estimate << "theta (known z) estimate: " << theta_known_z_estimate << std::endl;
 
-        return std::make_tuple(theta_estimate,z_estimate,theta_z_known_estimate);
+        return std::make_tuple(theta_estimate,z_estimate,theta_known_z_estimate);
     }
 
     
-    void writeMetadata( std::string filename ) const {
-        std::ofstream f(filename);
-        f << "Minimum edge length: " << minimum_edge_length << std::endl;
-        f << "Maximum circumradius: " << maximum_circumradius << std::endl;
-        f << "Theta: " << theta << std::endl;
-        f << "Intensity: " << intensity << std::endl;
-        f << "Max weight: " << max_weight << std::endl;
-    }
+    // void writeMetadata( std::string filename ) const {
+    //     std::ofstream f(filename);
+    //     f << "Minimum edge length: " << minimum_edge_length << std::endl;
+    //     f << "Maximum circumradius: " << maximum_circumradius << std::endl;
+    //     f << "Theta: " << theta << std::endl;
+    //     f << "Intensity: " << intensity << std::endl;
+    //     f << "Max weight: " << max_weight << std::endl;
+    // }
    
    
 	void analyze( std::string filename  )  {
@@ -1002,7 +1004,7 @@ public:
         // Estimate hardcore parameters
         double min_edge_est = *std::min_element( edge_lengths.begin(), edge_lengths.end() );
         double min_face_est = *std::min_element( face_surfaces.begin(), face_surfaces.end() );
-        double max_circumradius_est = *std::min_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
+        double max_circumradius_est = *std::max_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
 
         std::cout << "Min_edge_est: " << min_edge_est << " Max_a_est: " << max_circumradius_est << std::endl;
 
@@ -1042,17 +1044,16 @@ int main() {
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
 
 
-    int coef = 5;
-    int expon = 6;
+    int coef = 0;
+    int expon = 0;
     std::string filename(buf);
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
 
 
 	Gibbs_Delaunay GD;
-    // GD.initialize(true, "files/gibbs-1m.txt");
-    GD.writeMetadata("files/metadata" + filename + ".txt");
-	GD.initialize(true, "files/regular-grid.txt");  
-	GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
+    GD.initialize(true, "files/gibbs.txt");
+	// GD.initialize(true, "files/regular-grid.txt");  
+	// GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
 
 	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
     std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
