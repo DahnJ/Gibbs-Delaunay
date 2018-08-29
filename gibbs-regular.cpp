@@ -574,7 +574,8 @@ public:
                 double b = unif(generator);
                 std::cout << b << ",";
                 f << b << ",";
-                double ratio = ( expEnergy(energy)*intensity / ( (n+1) * expEnergy(energy_before)));
+                // double ratio = ( expEnergy(energy)*intensity / ( (n+1) * expEnergy(energy_before)));
+				double ratio =  exp(energy_before - energy) * intensity / (n+1);
                 std::cout << ratio << ",";
                 f << ratio << ",";
                 if ( forbidden || (b > ratio )){ // If not accepted, roll back
@@ -619,7 +620,8 @@ public:
 			double b = unif(generator);
 			std::cout << b << ",";
             f << b << ",";
-			double ratio = n*expEnergy(energy) / (expEnergy(energy_before)*intensity); 
+			//double ratio = n*expEnergy(energy) / (expEnergy(energy_before)*intensity); 
+			double ratio = n* exp(energy_before - energy) / intensity;
 			std::cout << ratio << ",";
             f << ratio << ",";
 			if ( forbidden || ( b > ratio)) {
@@ -670,7 +672,8 @@ public:
                 double b = unif(generator);
                 std::cout << b << ",";
                 f << b << ",";
-                double ratio = expEnergy(energy) / expEnergy(energy_before);
+                // double ratio = expEnergy(energy) / expEnergy(energy_before);
+				double ratio = exp(energy_before - energy);
                 std::cout << ratio << ",";
                 f << ratio << ",";
                 if ( forbidden || (b > ratio )) {
