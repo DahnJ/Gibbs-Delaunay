@@ -187,7 +187,7 @@ Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
 
 class Gibbs_Delaunay{
 private:
-	double minimum_edge_length;
+	double minimum_face_area;
 	double maximum_circumradius;
 	double theta;
 	double intensity;
@@ -203,8 +203,8 @@ private:
 
 
 public:
-	Gibbs_Delaunay( double _minimum_edge_length = 0.01, double _maximum_circumradius = 0.1, double _theta = 1.0, double _intensity = 500.0, double _max_weight = 0.01):
-		minimum_edge_length(_minimum_edge_length), maximum_circumradius(_maximum_circumradius), theta(_theta), intensity(_intensity), max_weight(_max_weight), forbidden(0) {  }; 
+	Gibbs_Delaunay( double _minimum_face_area = 0.001, double _maximum_circumradius = 0.1, double _theta = 1.0, double _intensity = 500.0, double _max_weight = 0.01):
+		minimum_face_area(_minimum_face_area), maximum_circumradius(_maximum_circumradius), theta(_theta), intensity(_intensity), max_weight(_max_weight), forbidden(0) {  }; 
 
 	int numberOfPoints() const {
 		return T.number_of_vertices();	
@@ -224,8 +224,8 @@ public:
 			if (T.is_infinite(cell)) { continue; }
 			Tetrahedron t = T.tetrahedron(cell);
 			if (!isActive(cell)) { continue; } 
-			if (minimumEdgeLength(t) < minimum_edge_length){
-				std::cout << "Short edge: " << minimumEdgeLength(t)  << std::endl;
+			if (minimumFaceArea(t) < minimum_face_area){
+				std::cout << "Small face: " << minimumFaceArea(t)  << std::endl;
 				if (update) {
 					if (add) {
 						forbidden++;
@@ -270,7 +270,7 @@ public:
 			if (T.is_infinite(cell)) { continue; }
 			Tetrahedron t = T.tetrahedron(cell);
 			if (!isActive(cell)) { continue; } 
-			if (minimumEdgeLength(t) < minimum_edge_length){
+			if (minimumFaceArea(t) < minimum_face_area){
 				if (update) {
 					if (add) {
 						forbidden++;
@@ -822,7 +822,7 @@ public:
         std::vector<double> samples;
 
         // Sample local energy for the integrals
-        while (samples_count < 10000){
+        while (samples_count < 100){
             Weighted_point p = uniformDistributionWeightedPoint();
             double local_energy = localEnergy(p) / theta; // Divide by theta to obtain energy with theta = 1
             if (std::isfinite(local_energy)) { 
@@ -876,7 +876,7 @@ public:
         while (error > 0.00001){
            estimate = (lower + upper) / 2.0;
            error = fabs(evaluateThetaEquation(estimate,samples,constant));
-           std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
+           // std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
 
            if (sign(evaluateThetaEquation(lower,samples,constant)) == sign(evaluateThetaEquation(estimate,samples,constant))) {
                lower = estimate;
@@ -1006,7 +1006,7 @@ public:
         double min_face_est = *std::min_element( face_surfaces.begin(), face_surfaces.end() );
         double max_circumradius_est = *std::max_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
 
-        std::cout << "Min_edge_est: " << min_edge_est << " Max_a_est: " << max_circumradius_est << std::endl;
+        std::cout << "Min_edge_est: " << min_edge_est << " min_face_est: " << min_face_est << " Max_a_est: " << max_circumradius_est << std::endl;
 
         
 
@@ -1017,7 +1017,7 @@ public:
         std::ofstream f(filename);
         f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est" << std::endl; 
 
-        f << minimum_edge_length << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";";
+        f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";";
         f << tetrahedra_volumes << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
         f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
         f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates);
@@ -1029,14 +1029,12 @@ public:
 
 
 };
-// TODO: Minimum face, not edge
 // TODO: Suggesting only addable points
 // 
 
 int main() {
     // Get a timestamp for the files
     // TODO: Improve the filenames / folders
-    // TODO: Save parameters, e.g. have metadata somewhere
     std::chrono::time_point<std::chrono::system_clock> time_now = std::chrono::system_clock::now();
     std::time_t time_now_t = std::chrono::system_clock::to_time_t(time_now);
     std::tm now_tm = *std::localtime(&time_now_t);
@@ -1044,16 +1042,17 @@ int main() {
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
 
 
-    int coef = 0;
-    int expon = 0;
+    int coef = 1;
+    int expon = 5;
     std::string filename(buf);
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
 
 
 	Gibbs_Delaunay GD;
-    GD.initialize(true, "files/gibbs.txt");
+    // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
-	// GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
+    GD.initialize(false);
+	GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
 
 	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
     std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
