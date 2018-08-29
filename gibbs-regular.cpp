@@ -13,6 +13,7 @@
 #include <chrono>
 #include <limits>
 #include <numeric> // for vector sum
+#include <string>
 
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
@@ -394,6 +395,7 @@ public:
 		updateEnergy(T.finite_cells_begin(), T.finite_cells_end());	
 		
 		std::cout << "Initialization done. Initial tessellation with " << T.number_of_vertices() << " vertices and " << T.number_of_cells() << " cells created. Initial energy: " << ( forbidden ? -1 : energy ) << std::endl;
+		std::cout << "Parameters. Theta: " << theta << ", minimum_face_area: " << minimum_face_area << ", maximum_circumradius: " << maximum_circumradius << ", intensity: " << intensity << ", max_weight: " << max_weight << std::endl; 
 
 		if (forbidden){
 			std::cout << "Tesselation is not permissible! Number of forbidden elements: " << forbidden << std::endl;
@@ -1032,7 +1034,7 @@ public:
 // TODO: Suggesting only addable points
 // 
 
-int main() {
+int main(int agrc, char* argv[]) {
     // Get a timestamp for the files
     // TODO: Improve the filenames / folders
     std::chrono::time_point<std::chrono::system_clock> time_now = std::chrono::system_clock::now();
@@ -1047,8 +1049,8 @@ int main() {
     std::string filename(buf);
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
 
-
-	Gibbs_Delaunay GD;
+    double theta = std::stod(argv[1]);
+	Gibbs_Delaunay GD(0.001, 0.1, theta);
     // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
     GD.initialize(false);
