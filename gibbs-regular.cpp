@@ -17,6 +17,7 @@
 
 
 bool COUT = false;
+bool FOUT = false;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
 typedef K::FT							Weight;
@@ -556,7 +557,7 @@ public:
 		double a = unif(generator);
 		if (a < 1.0/3.0) {
 			if (COUT) std::cout << "B,";            // TODO: Improve the output? E.g. not having two streams, having options for streams (more verbose?)
-            f << "B,";
+            if (FOUT) f << "B,";
 			int prev_total_n = T.number_of_vertices();
 			int n = number_of_active_points;
 		    	
@@ -564,36 +565,36 @@ public:
 			if (doesNotConflict(x)) {
 
 			    if (COUT) std::cout << x << ", ,";
-                f << x << ", ,";
+                if (FOUT) f << x << ", ,";
 
 			    double energy_before = energy;
 			    Rt::Vertex_handle added_vertex = add(x);
 		            	
 			    if (COUT) std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
-                f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
+                if (FOUT) f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
 			    
                 // See if we accept the proposal
                 double b = unif(generator);
                 if (COUT) std::cout << b << ",";
-                f << b << ",";
+                if (FOUT) f << b << ",";
                 // double ratio = ( expEnergy(energy)*intensity / ( (n+1) * expEnergy(energy_before)));
 				double ratio =  exp(energy_before - energy) * intensity / (n+1);
                 if (COUT) std::cout << ratio << ",";
-                f << ratio << ",";
+                if (FOUT) f << ratio << ",";
                 if ( forbidden || (b > ratio )){ // If not accepted, roll back
                     T.remove(added_vertex);
                     energy = energy_before;
                     forbidden = 0;
                     if (COUT) std::cout << "0,";
-                    f << "0,";
+                    if (FOUT) f << "0,";
                     if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
-                    f << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (FOUT) f << T.number_of_vertices() << "," << number_of_active_points << ",";
                 }
                 else{
                     if (COUT) std::cout << "1" << ",";
-                    f << "1" << ",";
+                    if (FOUT) f << "1" << ",";
                     if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
-                    f << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (FOUT) f << T.number_of_vertices() << "," << number_of_active_points << ",";
                 }
 
 			    number_of_active_points += (T.number_of_vertices() - prev_total_n);
@@ -601,13 +602,13 @@ public:
 		}
 		else if ( a > 2.0/3.0) {
 			if (COUT) std::cout << "D,";	
-            f << "D,";	
+            if (FOUT) f << "D,";	
 			// Choose a random point to remove
 			Rt::Vertex_handle vertex = chooseRandomVertexBetter();
 			Weighted_point removed_point = T.point(vertex);
 			
 			if (COUT) std::cout << removed_point << ", ,";
-            f << removed_point << ", ,";
+            if (FOUT) f << removed_point << ", ,";
 
 			int prev_total_n = T.number_of_vertices();
 			int n = number_of_active_points;
@@ -616,30 +617,30 @@ public:
 			
 
 			if (COUT) std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
-            f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
+            if (FOUT) f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
 			
 			// See if we accept the pproposal
 			double b = unif(generator);
 			if (COUT) std::cout << b << ",";
-            f << b << ",";
+            if (FOUT) f << b << ",";
 			//double ratio = n*expEnergy(energy) / (expEnergy(energy_before)*intensity); 
 			double ratio = n* exp(energy_before - energy) / intensity;
 			if (COUT) std::cout << ratio << ",";
-            f << ratio << ",";
+            if (FOUT) f << ratio << ",";
 			if ( forbidden || ( b > ratio)) {
 				T.insert(removed_point);
 				energy = energy_before;
 				forbidden = 0;
 				if (COUT) std::cout << "0,";
-                f << "0,";
+                if (FOUT) f << "0,";
 				if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
-                f << T.number_of_vertices() << "," << number_of_active_points << ",";
+                if (FOUT) f << T.number_of_vertices() << "," << number_of_active_points << ",";
 			}	
 			else{
 				if (COUT) std::cout << "1"<< ",";
-                f << "1"<< ",";
+                if (FOUT) f << "1"<< ",";
 				if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
-                f << T.number_of_vertices() << "," << number_of_active_points << ",";
+                if (FOUT) f << T.number_of_vertices() << "," << number_of_active_points << ",";
 
 			}
 
@@ -648,7 +649,7 @@ public:
 		}
 		else {
 			if (COUT) std::cout << "M,";	
-            f << "M,";	
+            if (FOUT) f << "M,";	
 			// Choose a random point to move
 			Rt::Vertex_handle vertex = chooseRandomVertexBetter();
 			Weighted_point old_point = T.point(vertex);
@@ -659,7 +660,7 @@ public:
 			
             if (doesNotConflict(x)) {
                 if (COUT) std::cout << old_point << "," << x << ",";
-                f << old_point << "," << x << ",";
+                if (FOUT) f << old_point << "," << x << ",";
                 int prev_total_n = T.number_of_vertices();
                 int n = number_of_active_points;
 
@@ -667,32 +668,32 @@ public:
                 Rt::Vertex_handle new_vertex = move(vertex, x);
 
                 if (COUT) std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
-                f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
+                if (FOUT) f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
 
                 
                 // See if we accept the proposal
                 double b = unif(generator);
                 if (COUT) std::cout << b << ",";
-                f << b << ",";
+                if (FOUT) f << b << ",";
                 // double ratio = expEnergy(energy) / expEnergy(energy_before);
 				double ratio = exp(energy_before - energy);
                 if (COUT) std::cout << ratio << ",";
-                f << ratio << ",";
+                if (FOUT) f << ratio << ",";
                 if ( forbidden || (b > ratio )) {
                     T.remove(new_vertex);
                     T.insert(old_point);
                     energy = energy_before;
                     forbidden = 0;
                     if (COUT) std::cout << "0,";
-                    f << "0,";
+                    if (FOUT) f << "0,";
                     if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
-                    f << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (FOUT) f << T.number_of_vertices() << "," << number_of_active_points << ",";
                 }	
                 else{
                     if (COUT) std::cout << "1" << ",";
-                    f << "1" << ",";
+                    if (FOUT) f << "1" << ",";
                     if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
-                    f << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (FOUT) f << T.number_of_vertices() << "," << number_of_active_points << ",";
 
                 }
                 number_of_active_points += (T.number_of_vertices() - prev_total_n);
@@ -713,17 +714,17 @@ public:
 		clock_t start;
         std::ofstream f(filename);
         if (COUT) std::cout << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
-        f << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
+        if (FOUT) f << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
 		for (int k = 1; k <= number_of_iterations; ++k){
 		 	start = clock();
 		 	if (COUT) std::cout << k << "," ;
-            f << k << "," ;
+            if (FOUT) f << k << "," ;
 		 	step(f);
 		 	if (COUT) std::cout << (double)(clock()-start)/CLOCKS_PER_SEC ;
-            f << (double)(clock()-start)/CLOCKS_PER_SEC;
+            if (FOUT) f << (double)(clock()-start)/CLOCKS_PER_SEC;
 		 	// std::cout << " " << number_of_active_points << " " <<  numberOfInactivePoints() ;
 		 	// std::cout << " Real energy: " << realEnergy(); 
-            f << std::endl;
+            if (FOUT) f << std::endl;
             if (COUT) std::cout << std::endl;
 		}
 		
