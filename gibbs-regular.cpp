@@ -16,6 +16,8 @@
 #include <string>
 
 
+bool COUT = false;
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
 typedef K::FT							Weight;
 typedef K::Point_3						Point;
@@ -204,7 +206,7 @@ private:
 
 
 public:
-	Gibbs_Delaunay( double _minimum_face_area = 0.001, double _maximum_circumradius = 0.1, double _theta = 1.0, double _intensity = 500.0, double _max_weight = 0.01):
+	Gibbs_Delaunay( double _minimum_face_area = 0.001, double _maximum_circumradius = 0.4, double _theta = 1.0, double _intensity = 500.0, double _max_weight = 0.01):
 		minimum_face_area(_minimum_face_area), maximum_circumradius(_maximum_circumradius), theta(_theta), intensity(_intensity), max_weight(_max_weight), forbidden(0) {  }; 
 
 	int numberOfPoints() const {
@@ -311,9 +313,9 @@ public:
 	}
 
 
-	double expEnergy(double energy){
-		return(exp(-energy));
-	}
+	// double expEnergy(double energy){
+	// 	return(exp(-energy));
+	// }
 
 	Rt::Vertex_handle chooseRandomVertexBetter(){
 		// Cell_handle containing_cell = T.locate(p);
@@ -411,21 +413,21 @@ public:
 
 
     // This function is now obsolete: hidden points are disabled
- 	void writeHiddenPoints() const {
-		std::cout << "Hidden points: " << std::endl;
-		int count = 0;
-		for (Rt::Finite_cells_iterator c = T.finite_cells_begin(); c != T.finite_cells_end(); ++c){
-			std::vector<Weighted_point> v;
-			std::copy(c->hidden_points_begin(), c->hidden_points_end(), std::back_inserter(v));
-			for (Weighted_point p: v){
-				std::cout << p << std::endl;
-				++count;
-		  	}
-		}
-		std::cout << "Number of hidden points: " << count;
-		
+ 	// void writeHiddenPoints() const {
+	// 	std::cout << "Hidden points: " << std::endl;
+	// 	int count = 0;
+	// 	for (Rt::Finite_cells_iterator c = T.finite_cells_begin(); c != T.finite_cells_end(); ++c){
+	// 		std::vector<Weighted_point> v;
+	// 		std::copy(c->hidden_points_begin(), c->hidden_points_end(), std::back_inserter(v));
+	// 		for (Weighted_point p: v){
+	// 			std::cout << p << std::endl;
+	// 			++count;
+	// 	  	}
+	// 	}
+	// 	std::cout << "Number of hidden points: " << count;
+	// 	
 
-	}
+	// }
 
     // Checks if the point is present in the cells (checks for weight equality, too)
     bool cellHasPoint(const Rt::Cell_handle& c, const Weighted_point& wp){
@@ -543,7 +545,7 @@ public:
 
 	}
 	
-	// TODO: Fix the bug where energy changes after a move
+	// TODO: Fix the bug where energy changes after a move -- is it not already fixed? Check
 	Rt::Vertex_handle move(Rt::Vertex_handle vertex_from, Weighted_point point_to){
 		remove(vertex_from);
 		Rt::Vertex_handle vertex = add(point_to);
@@ -553,7 +555,7 @@ public:
 	void step( std::ofstream& f){
 		double a = unif(generator);
 		if (a < 1.0/3.0) {
-			std::cout << "B,";            // TODO: Improve the output? E.g. not having two streams, having options for streams (more verbose?)
+			if (COUT) std::cout << "B,";            // TODO: Improve the output? E.g. not having two streams, having options for streams (more verbose?)
             f << "B,";
 			int prev_total_n = T.number_of_vertices();
 			int n = number_of_active_points;
@@ -561,36 +563,36 @@ public:
             Weighted_point x = uniformDistributionWeightedPoint();
 			if (doesNotConflict(x)) {
 
-			    std::cout << x << ", ,";
+			    if (COUT) std::cout << x << ", ,";
                 f << x << ", ,";
 
 			    double energy_before = energy;
 			    Rt::Vertex_handle added_vertex = add(x);
 		            	
-			    std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
+			    if (COUT) std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
                 f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
 			    
                 // See if we accept the proposal
                 double b = unif(generator);
-                std::cout << b << ",";
+                if (COUT) std::cout << b << ",";
                 f << b << ",";
                 // double ratio = ( expEnergy(energy)*intensity / ( (n+1) * expEnergy(energy_before)));
 				double ratio =  exp(energy_before - energy) * intensity / (n+1);
-                std::cout << ratio << ",";
+                if (COUT) std::cout << ratio << ",";
                 f << ratio << ",";
                 if ( forbidden || (b > ratio )){ // If not accepted, roll back
                     T.remove(added_vertex);
                     energy = energy_before;
                     forbidden = 0;
-                    std::cout << "0,";
+                    if (COUT) std::cout << "0,";
                     f << "0,";
-                    std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
                     f << T.number_of_vertices() << "," << number_of_active_points << ",";
                 }
                 else{
-                    std::cout << "1" << ",";
+                    if (COUT) std::cout << "1" << ",";
                     f << "1" << ",";
-                    std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
                     f << T.number_of_vertices() << "," << number_of_active_points << ",";
                 }
 
@@ -598,13 +600,13 @@ public:
             }
 		}
 		else if ( a > 2.0/3.0) {
-			std::cout << "D,";	
+			if (COUT) std::cout << "D,";	
             f << "D,";	
 			// Choose a random point to remove
 			Rt::Vertex_handle vertex = chooseRandomVertexBetter();
 			Weighted_point removed_point = T.point(vertex);
 			
-			std::cout << removed_point << ", ,";
+			if (COUT) std::cout << removed_point << ", ,";
             f << removed_point << ", ,";
 
 			int prev_total_n = T.number_of_vertices();
@@ -613,30 +615,30 @@ public:
 			remove(vertex);
 			
 
-			std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
+			if (COUT) std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
             f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
 			
 			// See if we accept the pproposal
 			double b = unif(generator);
-			std::cout << b << ",";
+			if (COUT) std::cout << b << ",";
             f << b << ",";
 			//double ratio = n*expEnergy(energy) / (expEnergy(energy_before)*intensity); 
 			double ratio = n* exp(energy_before - energy) / intensity;
-			std::cout << ratio << ",";
+			if (COUT) std::cout << ratio << ",";
             f << ratio << ",";
 			if ( forbidden || ( b > ratio)) {
 				T.insert(removed_point);
 				energy = energy_before;
 				forbidden = 0;
-				std::cout << "0,";
+				if (COUT) std::cout << "0,";
                 f << "0,";
-				std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
+				if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
                 f << T.number_of_vertices() << "," << number_of_active_points << ",";
 			}	
 			else{
-				std::cout << "1"<< ",";
+				if (COUT) std::cout << "1"<< ",";
                 f << "1"<< ",";
-				std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
+				if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
                 f << T.number_of_vertices() << "," << number_of_active_points << ",";
 
 			}
@@ -645,7 +647,7 @@ public:
 
 		}
 		else {
-			std::cout << "M,";	
+			if (COUT) std::cout << "M,";	
             f << "M,";	
 			// Choose a random point to move
 			Rt::Vertex_handle vertex = chooseRandomVertexBetter();
@@ -653,10 +655,10 @@ public:
 			// Generator a random vector by which the point will move
 			Vector move_by = normalDistributionVector(); 
 			Weighted_point x( bouncePoint(T.point(vertex).point() + move_by)  , T.point(vertex).weight());
-			// std::cout << "Proposing to move the point " << std::endl << T.point(vertex) << " by " << std::endl <<  move_by << " to " << std::endl <<  x;
+			// if (COUT) std::cout << "Proposing to move the point " << std::endl << T.point(vertex) << " by " << std::endl <<  move_by << " to " << std::endl <<  x;
 			
             if (doesNotConflict(x)) {
-                std::cout << old_point << "," << x << ",";
+                if (COUT) std::cout << old_point << "," << x << ",";
                 f << old_point << "," << x << ",";
                 int prev_total_n = T.number_of_vertices();
                 int n = number_of_active_points;
@@ -664,32 +666,32 @@ public:
                 double energy_before = energy;
                 Rt::Vertex_handle new_vertex = move(vertex, x);
 
-                std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
+                if (COUT) std::cout << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
                 f << energy_before << "," << ( forbidden ? -1 : energy ) << ","; 
 
                 
                 // See if we accept the proposal
                 double b = unif(generator);
-                std::cout << b << ",";
+                if (COUT) std::cout << b << ",";
                 f << b << ",";
                 // double ratio = expEnergy(energy) / expEnergy(energy_before);
 				double ratio = exp(energy_before - energy);
-                std::cout << ratio << ",";
+                if (COUT) std::cout << ratio << ",";
                 f << ratio << ",";
                 if ( forbidden || (b > ratio )) {
                     T.remove(new_vertex);
                     T.insert(old_point);
                     energy = energy_before;
                     forbidden = 0;
-                    std::cout << "0,";
+                    if (COUT) std::cout << "0,";
                     f << "0,";
-                    std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
                     f << T.number_of_vertices() << "," << number_of_active_points << ",";
                 }	
                 else{
-                    std::cout << "1" << ",";
+                    if (COUT) std::cout << "1" << ",";
                     f << "1" << ",";
-                    std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
+                    if (COUT) std::cout << T.number_of_vertices() << "," << number_of_active_points << ",";
                     f << T.number_of_vertices() << "," << number_of_active_points << ",";
 
                 }
@@ -710,19 +712,19 @@ public:
 	void iterate(int number_of_iterations, std::string filename ){
 		clock_t start;
         std::ofstream f(filename);
-        std::cout << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
+        if (COUT) std::cout << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
         f << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
 		for (int k = 1; k <= number_of_iterations; ++k){
 		 	start = clock();
-		 	std::cout << k << "," ;
+		 	if (COUT) std::cout << k << "," ;
             f << k << "," ;
 		 	step(f);
-		 	std::cout << (double)(clock()-start)/CLOCKS_PER_SEC ;
+		 	if (COUT) std::cout << (double)(clock()-start)/CLOCKS_PER_SEC ;
             f << (double)(clock()-start)/CLOCKS_PER_SEC;
 		 	// std::cout << " " << number_of_active_points << " " <<  numberOfInactivePoints() ;
 		 	// std::cout << " Real energy: " << realEnergy(); 
             f << std::endl;
-            std::cout << std::endl;
+            if (COUT) std::cout << std::endl;
 		}
 		
 		std::cout << std::endl << "isValid test: " << T.is_valid() << std::endl;
@@ -822,12 +824,12 @@ public:
     }
 
 
-    std::tuple<double,double,double>  estimate() {
+    std::tuple<double,double,double>  estimate(int samples_arg) {
         int samples_count = 0;
         std::vector<double> samples;
 
         // Sample local energy for the integrals
-        while (samples_count < 100){
+        while (samples_count < samples_arg){
             Weighted_point p = uniformDistributionWeightedPoint();
             double local_energy = localEnergy(p) / theta; // Divide by theta to obtain energy with theta = 1
             if (std::isfinite(local_energy)) { 
@@ -917,7 +919,7 @@ public:
         while (error > 0.0001){
            estimate = (lower + upper) / 2.0;
            error = fabs(evaluateThetaKnownZEquation(estimate,samples,constant));
-           std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaKnownZEquation(lower,samples,constant) << " " << evaluateThetaKnownZEquation(upper,samples,constant) << std::endl;
+           // std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaKnownZEquation(lower,samples,constant) << " " << evaluateThetaKnownZEquation(upper,samples,constant) << std::endl;
 
            if (sign(evaluateThetaKnownZEquation(lower,samples,constant)) == sign(evaluateThetaKnownZEquation(estimate,samples,constant))) {
                lower = estimate;
@@ -944,7 +946,7 @@ public:
     // }
    
    
-	void analyze( std::string filename  )  {
+	void analyze( std::string filename, int samples_arg  )  {
 		// Get only active cells
         // Gather data from active cells
 		std::vector<Tetrahedron> active_tetrahedra;
@@ -970,7 +972,7 @@ public:
 			} 
 		}
 		
-
+        // TODO: For some inexplicable reason there are more circumradii than active cells (in Python)
 		std::vector<double> tetrahedra_volumes;
         std::vector<double> tetrahedra_circumradii;
 		std::vector<double> face_surfaces;
@@ -1016,13 +1018,13 @@ public:
         
 
         // Estimate smooth interaction parameters
-        std::tuple<double,double,double> smooth_estimates  = estimate();
+        std::tuple<double,double,double> smooth_estimates  = estimate(samples_arg);
 
         // Output to a file
         std::ofstream f(filename);
-        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est" << std::endl; 
+        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est" << std::endl; 
 
-        f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";";
+        f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";" << energy << ";";
         f << tetrahedra_volumes << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
         f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
         f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates);
@@ -1037,6 +1039,14 @@ public:
 // TODO: Suggesting only addable points
 // 
 
+// Arguments
+// 1 Coef
+// 2 Exponent
+// 3 Theta
+// 4 Max circumradius
+// 5 Samples count
+
+
 int main(int agrc, char* argv[]) {
     // Get a timestamp for the files
     // TODO: Improve the filenames / folders
@@ -1047,13 +1057,15 @@ int main(int agrc, char* argv[]) {
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
 
 
-    int coef = 1;
-    int expon = 5;
+    int coef = std::stoi(argv[1]);
+    int expon = std::stoi(argv[2]);
     std::string filename(buf);
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
 
-    double theta = std::stod(argv[1]);
-	Gibbs_Delaunay GD(0.001, 0.1, theta);
+    double theta = std::stod(argv[3]);
+    double max_circum = std::stod(argv[4]);
+    // Min face, max circum, theta
+	Gibbs_Delaunay GD(0.001, 5, theta);
     // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
     GD.initialize(false);
@@ -1064,7 +1076,7 @@ int main(int agrc, char* argv[]) {
     std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
 
 	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
-	GD.analyze( "files/cell_data" + filename + ".txt" );
+	GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[5]));
 
 
 }
