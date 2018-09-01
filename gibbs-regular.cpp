@@ -711,6 +711,7 @@ public:
 	}
 
 	void iterate(int number_of_iterations, std::string filename ){
+        std::cout << "Number of iterations: " << number_of_iterations << std::endl;
 		clock_t start;
         std::ofstream f(filename);
         if (COUT) std::cout << "step_no,type,pt,pt_mv,energy,energy_after,b,ratio,accept,no_vrt,no_act_vrt,time" << std::endl;
@@ -876,8 +877,8 @@ public:
 
         // The best equation solver
         double error = 1;
-        double upper = 100;
-        double lower = -100;
+        double upper = 10000;
+        double lower = -10000;
         double estimate;
         assert( sign(evaluateThetaEquation(lower,samples,constant)) != sign(evaluateThetaEquation(upper,samples,constant)) ); 
 
@@ -912,8 +913,8 @@ public:
         /// Theta with z known
         // The best equation solver, again
         error = 1;
-        upper = 100;
-        lower = -100;
+        upper = 10000;
+        lower = -10000;
         constant = constant_unnormalized;
         assert( sign(evaluateThetaKnownZEquation(lower,samples,constant)) != sign(evaluateThetaKnownZEquation(upper,samples,constant)) ); 
 
@@ -1064,9 +1065,10 @@ int main(int agrc, char* argv[]) {
     filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
 
     double theta = std::stod(argv[3]);
-    double max_circum = std::stod(argv[4]);
+    double min_face = std::stod(argv[4]);
+    double max_circum = std::stod(argv[5]);
     // Min face, max circum, theta
-	Gibbs_Delaunay GD(0.001, 5, theta);
+	Gibbs_Delaunay GD(min_face, max_circum, theta);
     // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
     GD.initialize(false);
@@ -1077,7 +1079,7 @@ int main(int agrc, char* argv[]) {
     std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
 
 	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
-	GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[5]));
+	GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[6]));
 
 
 }
