@@ -162,6 +162,7 @@ std::mt19937		generator(rand_dev());
 //std::mt19937		generator(5);
 std::uniform_real_distribution<>	unif(0.0,1.0);
 std::normal_distribution<> 		norm{0,0.1};
+std::uniform_int_distribution<int> uni_int(0,100000);
 
 
 double uniformDistribution( double max = 1.0 ){
@@ -1059,13 +1060,16 @@ int main(int agrc, char* argv[]) {
     char buf[512];
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
     
-    std::chrono::milliseconds ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::system_clock::now().time_since_epoch());
-    std::string ms_s = std::to_string(ms.count()).substr(10,12);
+    // std::chrono::milliseconds ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::system_clock::now().time_since_epoch());
+    // std::string ms_s = std::to_string(ms.count()).substr(10,12);
+
+
+    int random_int = uni_int(generator);
 
     int coef = std::stoi(argv[1]);
     int expon = std::stoi(argv[2]);
     std::string filename(buf);
-    filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename + "_" +  ms_s;
+    filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename + "_" + std::to_string(random_int);
 
     double theta = std::stod(argv[3]);
     double min_face = std::stod(argv[4]);
