@@ -125,17 +125,17 @@ double surfaceArea( const Tetrahedron& t) {
 
 /////////// Functions to check and remain within the unit box
 
-bool isWithinUnitBox(const Point& p) {
-	return( (p.x() < 1) && (p.x() >= 0)
-	     && (p.y() < 1) && (p.y() >= 0)
-	     &&	(p.z() < 1) && (p.z() >= 0));
+bool isWithinUnitBox(const Point& p, float unit = 1) {
+	return( (p.x() < unit) && (p.x() >= 1-unit)
+	     && (p.y() < unit) && (p.y() >= 1-unit)
+	     &&	(p.z() < unit) && (p.z() >= 1-unit));
 
 
 }
 
 
-bool isWithinUnitBox(const Weighted_point& p) {
-	return(isWithinUnitBox(p.point()));
+bool isWithinUnitBox(const Weighted_point& p, float unit = 1) {
+	return(isWithinUnitBox(p.point(), unit));
 }
 
 
@@ -215,8 +215,8 @@ public:
 	}
 	
 
-	bool isActive(const Cell_handle& c) const {
-		return(isWithinUnitBox(CGAL::centroid(T.tetrahedron(c))));
+	bool isActive(const Cell_handle& c, float unit = 1) const {
+		return(isWithinUnitBox(CGAL::centroid(T.tetrahedron(c)), unit));
 
 	}
 
@@ -958,7 +958,7 @@ public:
         std::set<Rt::Vertex_handle> vertices_in_unit_box;
 
 		for (Rt::Finite_cells_iterator cell = T.finite_cells_begin(); cell != T.finite_cells_end(); ++cell) {
-			if (isActive(cell)) { 
+            if (isActive(cell,0.8)) { 
 				Tetrahedron t = T.tetrahedron(cell);				
 
 				active_tetrahedra.push_back(t); 
@@ -1045,8 +1045,9 @@ public:
 // 1 Coef
 // 2 Exponent
 // 3 Theta
-// 4 Max circumradius
-// 5 Samples count
+// 4 Min face area
+// 5 Max circumradius
+// 6 Samples count
 
 
 int main(int agrc, char* argv[]) {
