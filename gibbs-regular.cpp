@@ -1058,12 +1058,14 @@ int main(int agrc, char* argv[]) {
     std::tm now_tm = *std::localtime(&time_now_t);
     char buf[512];
     std::strftime(buf, 512, "_%Y%m%d_%H_%M_%S", &now_tm);
-
+    
+    std::chrono::milliseconds ms = std::chrono::duration_cast< std::chrono::milliseconds >(std::chrono::system_clock::now().time_since_epoch());
+    std::string ms_s = std::to_string(ms.count()).substr(10,12);
 
     int coef = std::stoi(argv[1]);
     int expon = std::stoi(argv[2]);
     std::string filename(buf);
-    filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename;
+    filename = "_" + std::to_string(coef) + "_" + std::to_string(expon) + filename + "_" +  ms_s;
 
     double theta = std::stod(argv[3]);
     double min_face = std::stod(argv[4]);
