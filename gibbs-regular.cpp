@@ -18,6 +18,7 @@
 
 bool COUT = false;
 bool FOUT = false;
+bool DELAUNAY = true;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
 typedef K::FT							Weight;
@@ -180,7 +181,13 @@ Point uniformDistributionPoint(){
 
 Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
 	Point p = uniformDistributionPoint();
-	Weight w = uniformDistribution(max);
+    Weight w;
+	if (DELAUNAY) {
+        w = 0.0001; 
+    }
+    else {
+        w = uniformDistribution(max);
+    }
 	return(Weighted_point(p,w));
 }
 
@@ -387,7 +394,7 @@ public:
 			CGAL::points_on_cube_grid_3( 1, number_of_points, std::back_inserter(points), Creator() );
 			for (Point& p: points){
 				p += Vector(0.5,0.5,0.5);
-				Weight w = 0.005;
+				Weight w = 0.0001;
 				weighted_points.push_back(Weighted_point(p,w));
 			}
 
@@ -827,7 +834,7 @@ public:
     }
 
 
-    std::tuple<double,double,double>  estimate(int samples_arg) {
+    std::tuple<double,double,double,double>  estimate(int samples_arg) {
         int samples_count = 0;
         std::vector<double> samples;
 
@@ -906,8 +913,20 @@ public:
         for (double h_i: samples){
             integral_estimate += exp(-theta_estimate*h_i);
         }
-        integral_estimate = integral_estimate / samples_count;
+        integral_estimate =  integral_estimate / samples_count;
+        
         double z_estimate = number_of_removable_points / integral_estimate;
+
+
+        
+        /// Estimate z with theta known (intensity)
+        // Estimate the integral
+        integral_estimate = 0;
+        for (double h_i: samples){
+            integral_estimate += exp(-theta*h_i);
+        }
+        integral_estimate =  integral_estimate / samples_count;
+        double z_known_theta_estimate = number_of_removable_points / integral_estimate;
 
 
 
@@ -935,7 +954,7 @@ public:
 
         std::cout << "Theta estimate: " << theta_estimate << " intensity estimate: " << z_estimate << "theta (known z) estimate: " << theta_known_z_estimate << std::endl;
 
-        return std::make_tuple(theta_estimate,z_estimate,theta_known_z_estimate);
+        return std::make_tuple(theta_estimate,z_estimate,theta_known_z_estimate, z_known_theta_estimate);
     }
 
     
@@ -959,7 +978,7 @@ public:
         std::set<Rt::Vertex_handle> vertices_in_unit_box;
 
 		for (Rt::Finite_cells_iterator cell = T.finite_cells_begin(); cell != T.finite_cells_end(); ++cell) {
-            if (isActive(cell,0.8)) { 
+            if (isActive(cell,0.95)) { 
 				Tetrahedron t = T.tetrahedron(cell);				
 
 				active_tetrahedra.push_back(t); 
@@ -1021,16 +1040,16 @@ public:
         
 
         // Estimate smooth interaction parameters
-        std::tuple<double,double,double> smooth_estimates  = estimate(samples_arg);
+        std::tuple<double,double,double,double> smooth_estimates  = estimate(samples_arg);
 
         // Output to a file
         std::ofstream f(filename);
-        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est" << std::endl; 
+        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est;" << "z_known_theta_est" << std::endl; 
 
         f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";" << energy << ";";
         f << tetrahedra_volumes << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
         f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
-        f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates);
+        f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates) << ";" << std::get<3>(smooth_estimates);
         f << std::endl;
 
 	}
