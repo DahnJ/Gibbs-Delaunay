@@ -228,14 +228,35 @@ public:
 
 	}
 
+    
+    bool isActiveCircum(const Cell_handle& c) const {
+        Tetrahedron t = T.tetrahedron(c);
+        double r = circumradius(t);
+        Point s = CGAL::circumcenter(t);
+        double dist_squared = r*r;
+        if (s.x() < 0) { dist_squared -= pow(s.x(),2); }
+        else if (s.x() > 1) {dist_squared -= pow(s.x() - 1,2);}
+        if (s.y() < 0) { dist_squared -= pow(s.y(),2); }
+        else if (s.y() > 1) {dist_squared -= pow(s.y() - 1,2);}
+        if (s.z() < 0) { dist_squared -= pow(s.z(),2); }
+        else if (s.z() > 1) {dist_squared -= pow(s.z() - 1,2);}
+        return dist_squared >  0;
+    }
+
+    
+
 	// TODO: Don't have the same function twice
 	double updateEnergy(const Rt::Finite_cells_iterator& begin, const Rt::Finite_cells_iterator& end, bool add = true, bool update = true) {
 		double energy_update = 0;
 
+        int cellcount = 0;
+
 		for (Rt::Finite_cells_iterator cell = begin; cell != end; ++cell) {
+            
 			if (T.is_infinite(cell)) { continue; }
 			Tetrahedron t = T.tetrahedron(cell);
-			if (!isActive(cell)) { continue; } 
+			if (!isActiveCircum(cell)) { continue; } 
+            cellcount ++;
 			if (minimumFaceArea(t) < minimum_face_area){
 				std::cout << "Small face: " << minimumFaceArea(t)  << std::endl;
 				if (update) {
@@ -247,6 +268,7 @@ public:
 					}
 				}
 			}
+
 			if (circumradius(t) > maximum_circumradius){
 				std::cout << "Large circumradius: " << circumradius(t)  << std::endl;
 				if (update) {
@@ -281,7 +303,7 @@ public:
 		for (const Cell_handle& cell: cells){
 			if (T.is_infinite(cell)) { continue; }
 			Tetrahedron t = T.tetrahedron(cell);
-			if (!isActive(cell)) { continue; } 
+			if (!isActiveCircum(cell)) { continue; } 
 			if (minimumFaceArea(t) < minimum_face_area){
 				if (update) {
 					if (add) {
@@ -386,17 +408,32 @@ public:
 		} 
 		else
 		{
-			int number_of_points = 6000;
-			std::vector<Point> points;
+			int number_of_points = pow(19,3); 
+            std::cout << "Wanted number of points: " << number_of_points << std::endl;
+			std::vector<Point> pointsA;
+            std::vector<Point> pointsB;
 			std::vector<Weighted_point> weighted_points;
-			points.reserve(number_of_points);
+			pointsA.reserve(number_of_points);
+            pointsB.reserve(number_of_points);
 
-			CGAL::points_on_cube_grid_3( 1, number_of_points, std::back_inserter(points), Creator() );
-			for (Point& p: points){
+			CGAL::points_on_cube_grid_3( 1, number_of_points, std::back_inserter(pointsA), Creator() );
+			CGAL::points_on_cube_grid_3( 1, number_of_points, std::back_inserter(pointsB), Creator() );
+			for (Point& p: pointsA){
 				p += Vector(0.5,0.5,0.5);
 				Weight w = 0.0001;
 				weighted_points.push_back(Weighted_point(p,w));
 			}
+
+            // Calculate the distance by which to move the second grid
+            // double d = 1.0/(number_of_points - 1); // ( d = (b-a)/(n-1) * (1/2), here b-a=2 and n = number of points)
+            // std::cout << "d = " << d << std::endl;
+			// for (Point& p: pointsB){
+			// 	p += Vector(0.5 + d,0.5 + d,0.5 + d);
+			// 	Weight w = 0.0001;
+			// 	weighted_points.push_back(Weighted_point(p,w));
+			// }
+
+            std::cout << "Vector length: " << weighted_points.size() << std::endl; 
 
 			T.insert(weighted_points.begin(), weighted_points.end());
 		}
@@ -1097,15 +1134,17 @@ int main(int agrc, char* argv[]) {
 	Gibbs_Delaunay GD(min_face, max_circum, theta);
     // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
-    GD.initialize(false);
-	GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
+    // GD.initialize(false);
+	// GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
 
 	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
     std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
-    std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
+    // std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
 
-	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
-	GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[6]));
+	// GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
+	// GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[6]));
+
+
 
 
 }
