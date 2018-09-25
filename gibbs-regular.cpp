@@ -17,7 +17,7 @@
 
 
 bool COUT = false;
-bool FOUT = false;
+bool FOUT = true;
 bool DELAUNAY = true;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
@@ -191,6 +191,41 @@ Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
 	return(Weighted_point(p,w));
 }
 
+
+
+class Poisson_Delaunay{
+private:
+    Rt T;
+    int n;
+
+public:
+    Poisson_Delaunay() {};
+    
+
+    void initialize(int n) {
+        std::vector<Point> points;
+        std::vector<Weighted_point> weighted_points;
+        CGAL::Random_points_in_cube_3<Point,Creator> g(0.5);
+        std::copy_n( g, n, std::back_inserter(points));
+
+        for (Point& p: points) {
+            Weight w = 0.0001;
+            weighted_points.push_back(Weighted_point(p,w));
+        }
+
+        T.insert(weighted_points.begin(), weighted_points.end());
+    }
+
+
+    int numberOfCells() const {
+        return T.number_of_cells();
+    }
+
+
+    int numberOfPoints() const {
+        return T.number_of_vertices();
+    }
+};
 
 
 
@@ -409,7 +444,6 @@ public:
 		else
 		{
 			int number_of_points = pow(19,3); 
-            std::cout << "Wanted number of points: " << number_of_points << std::endl;
 			std::vector<Point> pointsA;
             std::vector<Point> pointsB;
 			std::vector<Weighted_point> weighted_points;
@@ -432,8 +466,6 @@ public:
 			// 	Weight w = 0.0001;
 			// 	weighted_points.push_back(Weighted_point(p,w));
 			// }
-
-            std::cout << "Vector length: " << weighted_points.size() << std::endl; 
 
 			T.insert(weighted_points.begin(), weighted_points.end());
 		}
@@ -1033,6 +1065,7 @@ public:
 		
         // TODO: For some inexplicable reason there are more circumradii than active cells (in Python)
 		std::vector<double> tetrahedra_volumes;
+        std::vector<double> tetrahedra_surface;
         std::vector<double> tetrahedra_circumradii;
 		std::vector<double> face_surfaces;
 		std::vector<double> edge_lengths;
@@ -1047,6 +1080,7 @@ public:
 		for(Tetrahedron t: active_tetrahedra) { 
             tetrahedra_volumes.push_back(t.volume());
             tetrahedra_circumradii.push_back(circumradius(t));
+            tetrahedra_surface.push_back(surfaceArea(t));
         }
 		for(Face f: active_faces) { face_surfaces.push_back(faceArea(f)); }
 		for(Edge e: active_edges) { edge_lengths.push_back(edgeLength(e)); }
@@ -1081,10 +1115,10 @@ public:
 
         // Output to a file
         std::ofstream f(filename);
-        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est;" << "z_known_theta_est" << std::endl; 
+        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_surface;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est;" << "z_known_theta_est" << std::endl; 
 
         f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";" << energy << ";";
-        f << tetrahedra_volumes << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
+        f << tetrahedra_volumes << ";" << tetrahedra_surface << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
         f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
         f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates) << ";" << std::get<3>(smooth_estimates);
         f << std::endl;
@@ -1131,20 +1165,28 @@ int main(int agrc, char* argv[]) {
     double min_face = std::stod(argv[4]);
     double max_circum = std::stod(argv[5]);
     // Min face, max circum, theta
-	Gibbs_Delaunay GD(min_face, max_circum, theta);
+    Gibbs_Delaunay GD(min_face, max_circum, theta);
     // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
-    // GD.initialize(false);
-	// GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
+    GD.initialize(false);
+	GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
 
 	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
     std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
     // std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
 
-	// GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
-	// GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[6]));
+	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
+	GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[6]));
 
 
 
+    // Running Poisson
+    // for (int i =1; i <= 100; i++){
+    //     for (int j = 1; j <= 100; j++){
+    //         Poisson_Delaunay PD;
+    //         PD.initialize(10*i);
+    //         std::cout<< PD.numberOfPoints() << " " << PD.numberOfCells() << std::endl;
+    //     }
+    // }
 
 }
