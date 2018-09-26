@@ -17,9 +17,10 @@
 #include <algorithm> // for min
 
 
-bool COUT = true;
+bool COUT = true; 
 bool FOUT = true;
-bool DELAUNAY = true;
+bool DELAUNAY = true; // Forces all proposed points to have equal weight, causing the tessellation to be Delaunay
+
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
 typedef K::FT							Weight;
@@ -32,7 +33,6 @@ typedef std::tuple<Point,Point> 		 Edge;
 typedef K::Vector_3						Vector;
 typedef CGAL::Creator_uniform_3<double, Point> 			Creator;
 
-
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef CGAL::Triangulation_cell_base_3<K>   Cbb;
 typedef CGAL::Regular_triangulation_vertex_base_3<K>         Vb;
@@ -41,9 +41,7 @@ typedef CGAL::Regular_triangulation_cell_base_3<
 typedef CGAL::Triangulation_data_structure_3<Vb, Cb>          Tds;
 typedef CGAL::Regular_triangulation_3<K,Tds>                 Rt;
 
-
 typedef Rt::Tetrahedron						Tetrahedron;
-
 typedef Rt::Cell_handle						Cell_handle;
 
 
@@ -260,26 +258,38 @@ public:
 	}
 	
 
-	bool isActive(const Cell_handle& c, float unit = 1) const {
-		return(isWithinUnitBox(CGAL::centroid(T.tetrahedron(c)), unit));
+	bool isActive(const Cell_handle& c,  std::string type = "centroid", float unit = 1) const {
+        bool active = true;
+        if (type == "centroid") {
+            active = isWithinUnitBox(CGAL::centroid(T.tetrahedron(c)), unit);
+        }
+        else if (type == "all") {
+            for (int i = 0; i < 4; i++) {
+                if (!isWithinUnitBox(T.point(c->vertex(i)))) active = false;
+            }
+        }
+        else if (type == "circumsphere") {
+            Tetrahedron t = T.tetrahedron(c);
+            double r = circumradius(t);
+            Point s = CGAL::circumcenter(t);
+            double dist_squared = r*r;
+            if (s.x() < 0) { dist_squared -= pow(s.x(),2); }
+            else if (s.x() > 1) {dist_squared -= pow(s.x() - 1,2);}
+            if (s.y() < 0) { dist_squared -= pow(s.y(),2); }
+            else if (s.y() > 1) {dist_squared -= pow(s.y() - 1,2);}
+            if (s.z() < 0) { dist_squared -= pow(s.z(),2); }
+            else if (s.z() > 1) {dist_squared -= pow(s.z() - 1,2);}
+            active = (dist_squared >  0);
+        }
+        else  {
+            throw std::invalid_argument("isActive: type has to be either 'centroid', 'all', or 'circumsphere'");
+        }
+       
+		return active;
 
 	}
 
     
-    bool isActiveCircum(const Cell_handle& c) const {
-        Tetrahedron t = T.tetrahedron(c);
-        double r = circumradius(t);
-        Point s = CGAL::circumcenter(t);
-        double dist_squared = r*r;
-        if (s.x() < 0) { dist_squared -= pow(s.x(),2); }
-        else if (s.x() > 1) {dist_squared -= pow(s.x() - 1,2);}
-        if (s.y() < 0) { dist_squared -= pow(s.y(),2); }
-        else if (s.y() > 1) {dist_squared -= pow(s.y() - 1,2);}
-        if (s.z() < 0) { dist_squared -= pow(s.z(),2); }
-        else if (s.z() > 1) {dist_squared -= pow(s.z() - 1,2);}
-        return dist_squared >  0;
-    }
-
     
 
 	// TODO: Don't have the same function twice
@@ -293,7 +303,7 @@ public:
             
 			if (T.is_infinite(cell)) { continue; }
 			Tetrahedron t = T.tetrahedron(cell);
-			if (!isActiveCircum(cell)) { continue; } 
+			if (!isActive(cell, "circumsphere")) { continue; } 
             cellcount ++;
 
             if (hardcore) {
@@ -344,7 +354,7 @@ public:
 		for (const Cell_handle& cell: cells){
 			if (T.is_infinite(cell)) { continue; }
 			Tetrahedron t = T.tetrahedron(cell);
-			if (!isActiveCircum(cell)) { continue; } 
+			if (!isActive(cell, "circumsphere")) { continue; } 
 
 
             if (hardcore) {
@@ -1057,7 +1067,7 @@ public:
         std::set<Rt::Vertex_handle> vertices_in_unit_box;
 
 		for (Rt::Finite_cells_iterator cell = T.finite_cells_begin(); cell != T.finite_cells_end(); ++cell) {
-            if (isActive(cell,0.95)) { 
+            if (isActive(cell,"all")) { 
 				Tetrahedron t = T.tetrahedron(cell);				
 
 				active_tetrahedra.push_back(t); 
