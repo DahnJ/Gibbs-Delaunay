@@ -1190,7 +1190,7 @@ int main(int agrc, char* argv[]) {
     double min_face = std::stod(argv[6]);
     double max_circum = std::stod(argv[7]);
     // Min face, max circum, theta
-    Gibbs_Delaunay GD(min_face, max_circum, theta, z);
+    Gibbs_Delaunay GD(min_face, max_circum, theta, z, K);
     // GD.initialize(true, "files/gibbs.txt");
 	// GD.initialize(true, "files/regular-grid.txt");  
     GD.initialize(false);
