@@ -20,6 +20,7 @@
 bool COUT = true; 
 bool FOUT = true;
 bool DELAUNAY = true; // Forces all proposed points to have equal weight, causing the tessellation to be Delaunay
+bool ANALYZE = false;
 
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
@@ -1212,18 +1213,27 @@ int main(int agrc, char* argv[]) {
     double max_circum = std::stod(argv[7]);
     // Min face, max circum, theta
     Gibbs_Delaunay GD(min_face, max_circum, theta, z, K);
-    // GD.initialize(true, "files/gibbs.txt");
-	// GD.initialize(true, "files/regular-grid.txt");  
-    GD.initialize(false);
-	GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
 
-	std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
-    std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
-    // std::cout << "Number of removable points:" << GD.numberOfRemovablePoints() << std::endl;
+    if (ANALYZE) {
+        GD.initialize(true, "files/gibbs.txt");
 
-	GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
-	GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[8]));
+        std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
+        std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
 
+        GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[8]));
+    }
+    else {
+        // GD.initialize(true, "files/gibbs.txt");
+        // GD.initialize(true, "files/regular-grid.txt");  
+        GD.initialize(false);
+        GD.iterate(coef*pow(10,expon), "files/log" + filename + ".csv");
+
+        std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
+        std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
+
+        GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
+        GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[8]));
+    }
 
 
     // Running Poisson
