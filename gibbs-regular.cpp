@@ -171,21 +171,26 @@ double uniformDistribution( double max = 1.0 ){
 }
 
 Vector normalDistributionVector( double std = 0.01 ){
-	return(Vector(norm(generator),norm(generator),norm(generator)));
+    return(Vector(norm(generator),norm(generator),norm(generator)));
 }
 
-Point uniformDistributionPoint(){
-	return(Point(unif(generator),unif(generator),unif(generator)));
+// Uniformly distributed point with an option to shrink the window size (for estimation)
+Point uniformDistributionPoint(double window = 1.0){
+    double to_center = (1-window)/2;
+    Point p = Point(uniformDistribution(window) + to_center,uniformDistribution(window) + to_center,uniformDistribution(window) + to_center);
+	return(p);
 }
 
-Weighted_point uniformDistributionWeightedPoint( double max = 0.01 ){
-	Point p = uniformDistributionPoint();
+
+// Uniformly distributed weighted point with an option to shrink the window size (for estimation)
+Weighted_point uniformDistributionWeightedPoint( double window = 1.0, double w_max = 0.01 ){
+	Point p = uniformDistributionPoint(window);
     Weight w;
 	if (DELAUNAY) {
         w = 0.0001; 
     }
     else {
-        w = uniformDistribution(max);
+        w = uniformDistribution(w_max);
     }
 	return(Weighted_point(p,w));
 }
@@ -929,7 +934,7 @@ public:
 
         // Sample local energy for the integrals
         while (samples_count < samples_arg){
-            Weighted_point p = uniformDistributionWeightedPoint();
+            Weighted_point p = uniformDistributionWeightedPoint(0.9);
             double local_energy = localEnergy(p) / theta; // Divide by theta to obtain energy with theta = 1
             if (std::isfinite(local_energy)) { 
                 ++samples_count;
@@ -944,7 +949,7 @@ public:
 		int number_of_removable_points = 0;	
         std::vector<double> local_energy_removable_points;
 		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
-			if ( isWithinUnitBox(T.point(v))) { 
+			if (isWithinUnitBox(T.point(v))) { 
                 double local_energy = localEnergy(v) / theta; // Divide by theta to obtain energy with theta = 1
                 if (std::isfinite(local_energy)) {
                     ++number_of_removable_points;
@@ -968,7 +973,8 @@ public:
         // for (double tick: ticks){
         //     std::cout << evaluateThetaEquation(tick,samples,constant) << std::endl;
         // }
-        
+       
+        std::cout << std::endl;
         std::cout << "Number of removable points: " << number_of_removable_points << std::endl;
 
 
@@ -983,7 +989,6 @@ public:
            estimate = (lower + upper) / 2.0;
            error = fabs(evaluateThetaEquation(estimate,samples,constant));
            // std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
-
            if (sign(evaluateThetaEquation(lower,samples,constant)) == sign(evaluateThetaEquation(estimate,samples,constant))) {
                lower = estimate;
            }
@@ -1041,8 +1046,6 @@ public:
         }           
         double theta_known_z_estimate = estimate;
 
-        std::cout << "Theta estimate: " << theta_estimate << " intensity estimate: " << z_estimate << "theta (known z) estimate: " << theta_known_z_estimate << std::endl;
-
         return std::make_tuple(theta_estimate,z_estimate,theta_known_z_estimate, z_known_theta_estimate);
     }
 
@@ -1058,6 +1061,9 @@ public:
    
    
 	void analyze( std::string filename, int samples_arg  )  {
+        std::cout << std::endl;
+        std::cout << "Analyzing.." << std::endl;
+
 		// Get only active cells
         // Gather data from active cells
 		std::vector<Tetrahedron> active_tetrahedra;
@@ -1115,7 +1121,10 @@ public:
 		int number_of_vertices = point_weights.size();
 		int number_of_cells = active_tetrahedra.size();
 
-		// std::cout << tetrahedra_volumes.size() << " " << face_surfaces.size() << " " << edge_lengths.size() << " " << point_degrees.size() << " " << point_weights.size() << std::endl;
+		std::cout << "Number of tetrahedra: " << tetrahedra_volumes.size() << " " << tetrahedra_surface.size() << " " << std::endl;
+        std::cout << "No. of faces: " << face_surfaces.size() << std::endl; 
+        std::cout << "No. of edges: "  << edge_lengths.size() << std::endl;
+        std::cout << "No. of points: " << point_degrees.size() << " " << point_weights.size() << std::endl;
 
 
 
@@ -1126,7 +1135,11 @@ public:
         double min_face_est = *std::min_element( face_surfaces.begin(), face_surfaces.end() );
         double max_circumradius_est = *std::max_element( tetrahedra_circumradii.begin(), tetrahedra_circumradii.end()  );
 
-        std::cout << "Min_edge_est: " << min_edge_est << " min_face_est: " << min_face_est << " Max_a_est: " << max_circumradius_est << std::endl;
+        std::cout << std::endl;
+        std::cout << "Hardcore estimates" << std::endl;
+        std::cout << "Maximum edge: " << min_edge_est << std::endl;
+        std::cout << "Minimum face: " << min_face_est << std::endl; 
+        std::cout << "Maximum circumradius: " << max_circumradius_est << std::endl;
 
         
 
@@ -1142,6 +1155,14 @@ public:
         f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
         f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates) << ";" << std::get<3>(smooth_estimates);
         f << std::endl;
+
+
+        std::cout << std::endl;
+        std::cout << "Smooth parameter estimates" << std::endl;
+        std::cout << "Theta: " << std::get<0>(smooth_estimates) << std::endl;
+        std::cout << "z: " << std::get<1>(smooth_estimates) << std::endl;
+        std::cout << "Theta (known z): " << std::get<2>(smooth_estimates) << std::endl;
+        std::cout << "z (known theta): " << std::get<3>(smooth_estimates) << std::endl;
 
 	}
 
