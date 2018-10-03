@@ -19,7 +19,7 @@
 
 bool COUT = false; 
 bool FOUT = false;
-bool DELAUNAY = true; // Forces all proposed points to have equal weight, causing the tessellation to be Delaunay
+bool DELAUNAY = false; // Forces all proposed points to have equal weight, causing the tessellation to be Delaunay
 bool ANALYZE = false;
 
 
@@ -178,8 +178,8 @@ Vector normalDistributionVector( double std = 0.01 ){
 
 // Uniformly distributed point with an option to shrink the window size (for estimation)
 Point uniformDistributionPoint(double window = 1.0){
-    double to_center = (1-window)/2;
-    Point p = Point(uniformDistribution(window) + to_center,uniformDistribution(window) + to_center,uniformDistribution(window) + to_center);
+    double pad = (1-window)/2;
+    Point p = Point(uniformDistribution(window) + pad,uniformDistribution(window) + pad,uniformDistribution(window) + pad);
 	return(p);
 }
 
@@ -888,7 +888,7 @@ public:
 
     // TODO: Check for existing point?
     double localEnergy( const Weighted_point & p ) {
-        if (!doesNotConflict(p)) { return std::numeric_limits<double>::infinity();  }     
+        if (!doesNotConflict(p)) { return std::numeric_limits<double>::infinity();  }    // Do not allow conflicting points 
         double energy_before_adding = energy;
         Rt::Vertex_handle v = add(p);
         double energy_after_adding;
@@ -932,6 +932,7 @@ public:
 
 
     std::tuple<double,double,double,double>  estimate(int samples_arg, float sampling_window) {
+        std::cout << "Estimating using the sampling window " << sampling_window << std::endl; 
         int samples_count = 0;
         std::vector<double> samples;
 
@@ -954,7 +955,7 @@ public:
 		int number_of_removable_points = 0;	
         std::vector<double> local_energy_removable_points;
 		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
-			if (isWithinUnitBox(T.point(v)), sampling_window) { 
+			if (isWithinUnitBox(T.point(v), sampling_window)) { 
                 double local_energy = localEnergy(v) / theta; // Divide by theta to obtain energy with theta = 1
                 if (std::isfinite(local_energy)) {
                     ++number_of_removable_points;
@@ -1156,7 +1157,7 @@ public:
         
 
         // Estimate smooth interaction parameters
-        std::tuple<double,double,double,double> smooth_estimates  = estimate(samples_arg, 0.8);
+        std::tuple<double,double,double,double> smooth_estimates  = estimate(samples_arg, 1.0);
 
         // Output to a file
         std::ofstream f(filename);
