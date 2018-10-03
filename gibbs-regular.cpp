@@ -17,8 +17,8 @@
 #include <algorithm> // for min
 
 
-bool COUT = true; 
-bool FOUT = true;
+bool COUT = false; 
+bool FOUT = false;
 bool DELAUNAY = true; // Forces all proposed points to have equal weight, causing the tessellation to be Delaunay
 bool ANALYZE = false;
 
@@ -127,9 +127,10 @@ double surfaceArea( const Tetrahedron& t) {
 /////////// Functions to check and remain within the unit box
 
 bool isWithinUnitBox(const Point& p, float unit = 1) {
-	return( (p.x() < unit) && (p.x() >= 1-unit)
-	     && (p.y() < unit) && (p.y() >= 1-unit)
-	     &&	(p.z() < unit) && (p.z() >= 1-unit));
+    float pad = (1-unit)/2;
+	return( (p.x() < unit + pad) && (p.x() >= pad)
+	     && (p.y() < unit + pad) && (p.y() >= pad)
+	     &&	(p.z() < unit + pad) && (p.z() >= pad));
 
 
 }
@@ -915,6 +916,7 @@ public:
         double sum_value = 0;
         for (double h_i: local_energy_samples){
             sum_value += exp(-theta_estimate * h_i) * ( h_i - constant );
+            // std::cout << "Sum value: " << sum_value << " after adding local energy " << h_i << std::endl; 
         }
         return sum_value;
     }
@@ -929,13 +931,15 @@ public:
     }
 
 
-    std::tuple<double,double,double,double>  estimate(int samples_arg) {
+    std::tuple<double,double,double,double>  estimate(int samples_arg, float sampling_window) {
         int samples_count = 0;
         std::vector<double> samples;
 
         // Sample local energy for the integrals
+        std::cout << "Sampling" << std::endl;
         while (samples_count < samples_arg){
-            Weighted_point p = uniformDistributionWeightedPoint(0.9);
+            std::cout << samples_count << " "; 
+            Weighted_point p = uniformDistributionWeightedPoint(sampling_window);
             double local_energy = localEnergy(p) / theta; // Divide by theta to obtain energy with theta = 1
             if (std::isfinite(local_energy)) { 
                 ++samples_count;
@@ -950,7 +954,7 @@ public:
 		int number_of_removable_points = 0;	
         std::vector<double> local_energy_removable_points;
 		for (Rt::Finite_vertices_iterator v = T.finite_vertices_begin(); v != T.finite_vertices_end(); ++v){
-			if (isWithinUnitBox(T.point(v))) { 
+			if (isWithinUnitBox(T.point(v)), sampling_window) { 
                 double local_energy = localEnergy(v) / theta; // Divide by theta to obtain energy with theta = 1
                 if (std::isfinite(local_energy)) {
                     ++number_of_removable_points;
@@ -959,7 +963,9 @@ public:
             }	
 		} 
         double constant_unnormalized = std::accumulate( local_energy_removable_points.begin(), local_energy_removable_points.end(), 0.0);
+        std::cout << "Constant unnormalized: " << constant_unnormalized << std::endl;
         double constant = constant_unnormalized / number_of_removable_points;
+        std::cout << "Constant normalized: " << constant << std::endl;
      
         
         // std::vector<double> ticks; 
@@ -981,15 +987,15 @@ public:
 
         // The best equation solver
         double error = 1;
-        double upper = 10000;
-        double lower = -10000;
+        double upper = theta + 15;
+        double lower = theta - 15;
         double estimate;
         assert( sign(evaluateThetaEquation(lower,samples,constant)) != sign(evaluateThetaEquation(upper,samples,constant)) ); 
 
         while (error > 0.00001){
            estimate = (lower + upper) / 2.0;
            error = fabs(evaluateThetaEquation(estimate,samples,constant));
-           // std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
+           std::cout << lower << " " <<  upper << " " <<  estimate << " " <<  error << " " << evaluateThetaEquation(lower,samples,constant) << " " << evaluateThetaEquation(upper,samples,constant) << std::endl;
            if (sign(evaluateThetaEquation(lower,samples,constant)) == sign(evaluateThetaEquation(estimate,samples,constant))) {
                lower = estimate;
            }
@@ -1028,8 +1034,8 @@ public:
         /// Theta with z known
         // The best equation solver, again
         error = 1;
-        upper = 10000;
-        lower = -10000;
+        upper = theta + 15;
+        lower = theta - 15;
         constant = constant_unnormalized;
         assert( sign(evaluateThetaKnownZEquation(lower,samples,constant)) != sign(evaluateThetaKnownZEquation(upper,samples,constant)) ); 
 
@@ -1128,6 +1134,11 @@ public:
         std::cout << "No. of points: " << point_degrees.size() << " " << point_weights.size() << std::endl;
 
 
+        std::cout << "Point degrees: " << std::endl;
+		for(Rt::Vertex_handle v: vertices_in_unit_box) { 
+            std::cout << T.degree(v) << " " << T.point(v) << std::endl;
+		}
+
 
 
 
@@ -1138,14 +1149,14 @@ public:
 
         std::cout << std::endl;
         std::cout << "Hardcore estimates" << std::endl;
-        std::cout << "Maximum edge: " << min_edge_est << std::endl;
+        std::cout << "Minimum edge: " << min_edge_est << std::endl;
         std::cout << "Minimum face: " << min_face_est << std::endl; 
         std::cout << "Maximum circumradius: " << max_circumradius_est << std::endl;
 
         
 
         // Estimate smooth interaction parameters
-        std::tuple<double,double,double,double> smooth_estimates  = estimate(samples_arg);
+        std::tuple<double,double,double,double> smooth_estimates  = estimate(samples_arg, 0.8);
 
         // Output to a file
         std::ofstream f(filename);
