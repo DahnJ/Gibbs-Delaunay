@@ -1229,7 +1229,7 @@ int main(int agrc, char* argv[]) {
         std::cout << "Number of points, total: " << GD.numberOfPoints() << std::endl;
         std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
 
-        GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[8]));
+        GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[7]));
     }
     else {
         // GD.initialize(true, "files/gibbs.txt");
@@ -1241,7 +1241,7 @@ int main(int agrc, char* argv[]) {
         std::cout << "Number of active points (within unit box):  " << GD.numberOfActivePoints() << std::endl;
 
         GD.writeTessellationToFile("files/gibbs" + filename + ".txt");
-        GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[8]));
+        GD.analyze( "files/cell_data" + filename + ".txt" , std::stoi(argv[7]));
     }
 
 
