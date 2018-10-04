@@ -244,7 +244,6 @@ private:
 	double maximum_circumradius;
 	double theta;
 	double intensity;
-    double K;
 	
 	double energy = 0;
 	int forbidden; // number of forbidden cells/edges detected 
@@ -257,8 +256,8 @@ private:
 
 
 public:
-	Gibbs_Delaunay( double _minimum_face_area = 0.001, double _maximum_circumradius = 0.4, double _theta = 1.0, double _intensity = 500.0, double _K = 1, double _max_weight = 0.01):
-		minimum_face_area(_minimum_face_area), maximum_circumradius(_maximum_circumradius), theta(_theta), intensity(_intensity), K(_K), max_weight(_max_weight), forbidden(0) {  }; 
+	Gibbs_Delaunay( double _minimum_face_area = 0.001, double _maximum_circumradius = 0.4, double _theta = 1.0, double _intensity = 500.0, double _max_weight = 0.01):
+		minimum_face_area(_minimum_face_area), maximum_circumradius(_maximum_circumradius), theta(_theta), intensity(_intensity), max_weight(_max_weight), forbidden(0) {  }; 
 
 	int numberOfPoints() const {
 		return T.number_of_vertices();	
@@ -300,7 +299,7 @@ public:
     
 
 	// TODO: Don't have the same function twice
-	double updateEnergy(const Rt::Finite_cells_iterator& begin, const Rt::Finite_cells_iterator& end, bool add = true, bool update = true, bool hardcore = false) {
+	double updateEnergy(const Rt::Finite_cells_iterator& begin, const Rt::Finite_cells_iterator& end, bool add = true, bool update = true, bool hardcore = true) {
 		double energy_update = 0;
 
         int cellcount = 0;
@@ -339,7 +338,7 @@ public:
                 }
             }
 
-			energy_update += theta*std::min(K,surfaceArea(t));
+			energy_update += theta*surfaceArea(t);
 
 		}
 	
@@ -356,7 +355,7 @@ public:
 		return(energy_update);
 	}
 	
-	double updateEnergy(const std::vector<Cell_handle>& cells, bool add = true, bool update = true, bool hardcore = false) {
+	double updateEnergy(const std::vector<Cell_handle>& cells, bool add = true, bool update = true, bool hardcore = true) {
 		double energy_update = 0;
 		for (const Cell_handle& cell: cells){
 			if (T.is_infinite(cell)) { continue; }
@@ -388,7 +387,7 @@ public:
                 }
             }
 
-			energy_update += theta*std::min(K,surfaceArea(t));
+			energy_update += theta*surfaceArea(t);
 
 		}
 		
@@ -1161,9 +1160,9 @@ public:
 
         // Output to a file
         std::ofstream f(filename);
-        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "K;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_surface;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est;" << "z_known_theta_est" << std::endl; 
+        f << "epsilon;" << "alpha;" << "theta;" << "z;" << "max_weight;" << "energy;" << "tetra_volume;" << "tetra_surface;" << "tetra_circum;" <<  "face_surf;" << "edge_length;" << "point_weight;" << "point_degree;" << "cells;" << "vertices;" << "removable;" << "epsilon_est;" << "face_est;" << "alpha_est;" << "theta_est;" << "z_est;" << "theta_known_z_est;" << "z_known_theta_est" << std::endl; 
 
-        f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << K << ";" << max_weight << ";" << energy << ";";
+        f << minimum_face_area << ";" << maximum_circumradius << ";" << theta << ";" << intensity << ";" << max_weight << ";" << energy << ";";
         f << tetrahedra_volumes << ";" << tetrahedra_surface << ";" << tetrahedra_circumradii << ";" << face_surfaces << ";" << edge_lengths << ";" << point_weights << ";" << point_degrees << ";";
         f << number_of_cells << ";" << number_of_vertices << ";" << number_of_removable_points << ";";
         f << min_edge_est << ";" << min_face_est << ";" << max_circumradius_est << ";" << std::get<0>(smooth_estimates) << ";" << std::get<1>(smooth_estimates) << ";" << std::get<2>(smooth_estimates) << ";" << std::get<3>(smooth_estimates);
@@ -1192,10 +1191,9 @@ public:
 // 2 Exponent
 // 3 Theta
 // 4 z
-// 5 K
-// 6 Min face area
-// 7 Max circumradius
-// 8 Samples count
+// 5 Min face area
+// 6 Max circumradius
+// 7 Samples count
 
 
 int main(int agrc, char* argv[]) {
@@ -1220,11 +1218,10 @@ int main(int agrc, char* argv[]) {
 
     double theta = std::stod(argv[3]);
     double z = std::stod(argv[4]);
-    double K = std::stod(argv[5]);
-    double min_face = std::stod(argv[6]);
-    double max_circum = std::stod(argv[7]);
+    double min_face = std::stod(argv[5]);
+    double max_circum = std::stod(argv[6]);
     // Min face, max circum, theta
-    Gibbs_Delaunay GD(min_face, max_circum, theta, z, K);
+    Gibbs_Delaunay GD(min_face, max_circum, theta, z);
 
     if (ANALYZE) {
         GD.initialize(true, "files/gibbs.txt");
