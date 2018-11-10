@@ -1,8 +1,6 @@
-
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Regular_triangulation_3.h>
 #include <CGAL/point_generators_3.h>
-// #include <CGAL/Kernel/global_functions.h>
 #include <vector>
 #include <iostream>
 #include <cmath>
@@ -17,12 +15,14 @@
 #include <algorithm> // for min
 
 
+// Global settings
 bool COUT = false; 
 bool FOUT = false;
 bool DELAUNAY = false; // Forces all proposed points to have equal weight, causing the tessellation to be Delaunay
 bool ANALYZE = false;
 
 
+// Typedefs
 typedef CGAL::Exact_predicates_inexact_constructions_kernel	K;
 typedef K::FT							Weight;
 typedef K::Point_3						Point;
@@ -46,13 +46,14 @@ typedef Rt::Tetrahedron						Tetrahedron;
 typedef Rt::Cell_handle						Cell_handle;
 
 
-// TODO: Rewrite forbidden to infinity
 
 // Abstractions
 // - easily specifiable energy function and calculation
 // - delaunay x regular
 
 
+
+// Inserting vectors in to streams for std::cout
 template <typename T>
 std::ostream& operator<< (std::ostream& out, const std::vector<T> v){
     if ( !v.empty() ){
